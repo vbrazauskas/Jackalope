@@ -79,5 +79,6 @@ protected:
 
 private:
   void RepeatSendTcp(Sample *sample, bool retry);
+  void RepeatSendTcp1(Sample *sample, bool retry);
   void clearRecv(SOCKET delivery_socket);
 };

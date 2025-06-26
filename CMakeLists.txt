@@ -126,6 +126,10 @@ add_executable(test
   test.cpp
   )
   
+add_executable(test_base64
+  test_base64.cpp
+  )
+  
 if(LINUX)
   target_link_libraries(test rt)
 endif()
