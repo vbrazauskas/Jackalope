@@ -22,10 +22,16 @@ limitations under the License.
 
 #include <sstream>
 
-void TinyInstInstrumentation::Init(int argc, char **argv)
+TinyInstInstrumentation::TinyInstInstrumentation(int ctx_thread_id)
 {
+  this->ctx_thread_id = ctx_thread_id;
+}
+
+void TinyInstInstrumentation::Init(int argc, char **argv)
+{  
   instrumentation = new LiteCov();
   instrumentation->Init(argc, argv);
+  instrumentation->SetThreadToEnvVars(ctx_thread_id);
 
   persist = GetBinaryOption("-persist", argc, argv, false);
   num_iterations = GetIntOption("-iterations", argc, argv, 1);

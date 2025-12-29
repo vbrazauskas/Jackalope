@@ -1179,7 +1179,7 @@ Instrumentation *Fuzzer::CreateInstrumentation(int argc, char **argv, ThreadCont
 
   if (!instrumentation)
   {
-    instrumentation = new TinyInstInstrumentation();
+    instrumentation = new TinyInstInstrumentation(tc->thread_id);
   }
 
   instrumentation->Init(argc, argv);
@@ -1236,6 +1236,43 @@ SampleDelivery *Fuzzer::CreateSampleDelivery(int argc, char **argv, ThreadContex
     }
     NetworkSampleDelivery *sampleDelivery = new NetworkSampleDelivery(address, port, init_time);
     return sampleDelivery;
+  }
+  else if (!strcmp(option, "environment"))
+  {
+    string extension = "";
+    char *extension_opt = GetOption("-file_extension", argc, argv);
+    if (extension_opt)
+    {
+      extension = string(".") + string(extension_opt);
+    }
+    string outfile = DirJoin(delivery_dir, string("input_") + std::to_string(tc->thread_id) + extension);
+
+    // Find @@VARNAME in target_argv and extract VARNAME
+    const char *env_prefix = "@@";
+    char *env_var_name = nullptr;
+    
+    for (int i = 0; i < tc->target_argc; i++) {
+      if (strncmp(tc->target_argv[i], env_prefix, 2) == 0 && strlen(tc->target_argv[i]) > 2) {
+        env_var_name = tc->target_argv[i] + 2;
+        // Replace @@VARNAME with @@VARNAME=outfile
+        std::string new_arg = std::string("@@") + env_var_name + "=" + outfile;
+        ReplaceTargetCmdArg(tc, tc->target_argv[i], new_arg.c_str());
+        break;
+      }
+    }
+
+    if (!env_var_name) {
+      FATAL("No environment variable name specified with @@VARNAME in target command line");
+    }
+
+    // This file will be passed to the target process via the environment variable
+    // e.g., if the target command line has @@VARNAME, it will be replaced with @@VARNAME=outfile
+    // where outfile is the file path to save the input sample.
+    FileSampleDelivery *sampleDelivery = new FileSampleDelivery();
+    sampleDelivery->Init(argc, argv);
+    sampleDelivery->SetFilename(outfile);
+    return sampleDelivery;
+
   }
   else
   {

@@ -110,7 +110,7 @@ char *crash = NULL;
 
 // actual target function
 
-void FUZZ_TARGET_MODIFIERS fuzz(char *name) {
+void FUZZ_TARGET_MODIFIERS fuzz(const char *name) {
   char *sample_bytes = NULL;
   uint32_t sample_size = 0;
   
@@ -148,8 +148,12 @@ void FUZZ_TARGET_MODIFIERS fuzz(char *name) {
 
 int main(int argc, char **argv)
 {
+  const char* filename = NULL;
   if(argc != 3) {
-    printf("Usage: %s <-f|-m> <file or shared memory name>\n", argv[0]);
+    printf("Usage: %s <-f|-m|-e> <file/shared memory/env var name>\n", argv[0]);
+    printf("  -f <file> : read sample from file\n");
+    printf("  -m <shm>  : read sample from shared memory\n");
+    printf("  -e <env>  : read sample file path from environment variable named <env>\n");
     return 0;
   }
   
@@ -157,8 +161,17 @@ int main(int argc, char **argv)
     use_shared_memory = true;
   } else if(!strcmp(argv[1], "-f")) {
     use_shared_memory = false;
+	filename = argv[2];
+  } else if(!strcmp(argv[1], "-e")) {
+    use_shared_memory = false;
+    const char* env_var_name = argv[2];
+    filename = getenv(env_var_name);
+    if (!filename) {
+      printf("Environment variable '%s' not set\n", env_var_name);
+      return 0;
+    }
   } else {
-    printf("Usage: %s <-f|-m> <file or shared memory name>\n", argv[0]);
+    printf("Usage: %s <-f|-m|-e> <file/shared memory/env var name>\n", argv[0]);
     return 0;
   }
 
@@ -170,7 +183,7 @@ int main(int argc, char **argv)
     }
   }
 
-  fuzz(argv[2]);
+  fuzz(filename);
   
   return 0;
 }

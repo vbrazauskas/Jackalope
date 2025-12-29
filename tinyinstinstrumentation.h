@@ -25,7 +25,8 @@ limitations under the License.
 class LiteCov;
 
 class TinyInstInstrumentation : public Instrumentation {
-public:
+public:  
+  TinyInstInstrumentation(int ctx_thread_id = 0);
   ~TinyInstInstrumentation();
 
   void Init(int argc, char **argv) override;
@@ -49,5 +50,6 @@ protected:
   bool persist;
   int num_iterations;
   int cur_iteration;
+  int ctx_thread_id = 0;
 };
 
