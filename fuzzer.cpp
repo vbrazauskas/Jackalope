@@ -1119,6 +1119,12 @@ Fuzzer::ThreadContext *Fuzzer::CreateThreadContext(int argc, char **argv, int th
 
   tc->thread_id = thread_id;
   tc->fuzzer = this;
+  
+  // Replace ##FUZZ_THREAD_ID## placeholder with actual thread ID
+  char thread_id_str[32];
+  sprintf(thread_id_str, "%d", thread_id);
+  ReplaceTargetCmdArgSubstring(tc, "##FUZZ_THREAD_ID##", thread_id_str);
+  
   tc->prng = CreatePRNG(argc, argv, tc);
   tc->mutator = CreateMutator(argc, argv, tc);
   tc->instrumentation = CreateInstrumentation(argc, argv, tc);
@@ -1156,6 +1162,39 @@ void Fuzzer::ReplaceTargetCmdArg(ThreadContext *tc, const char *search, const ch
       char *arg = (char *)malloc(strlen(replace) + 1);
       strcpy(arg, replace);
       tc->target_argv[i] = arg;
+    }
+  }
+}
+
+void Fuzzer::ReplaceTargetCmdArgSubstring(ThreadContext *tc, const char *search, const char *replace)
+{
+  size_t search_len = strlen(search);
+  size_t replace_len = strlen(replace);
+  
+  for (int i = 0; i < tc->target_argc; i++)
+  {
+    char *found = strstr(tc->target_argv[i], search);
+    if (found)
+    {
+      // Calculate the new string length
+      size_t prefix_len = found - tc->target_argv[i];
+      size_t suffix_len = strlen(found + search_len);
+      size_t new_len = prefix_len + replace_len + suffix_len;
+      
+      // Allocate new string
+      char *new_arg = (char *)malloc(new_len + 1);
+      
+      // Copy prefix
+      memcpy(new_arg, tc->target_argv[i], prefix_len);
+      
+      // Copy replacement
+      memcpy(new_arg + prefix_len, replace, replace_len);
+      
+      // Copy suffix
+      strcpy(new_arg + prefix_len + replace_len, found + search_len);
+      
+      // Replace the argument
+      tc->target_argv[i] = new_arg;
     }
   }
 }
