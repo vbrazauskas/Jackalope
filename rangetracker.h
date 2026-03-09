@@ -26,9 +26,9 @@ limitations under the License.
 
 class RangeTracker {
 public:
-  RangeTracker() {}
-  virtual ~RangeTracker() {}
-  virtual void ExtractRanges(std::vector<Range>* ranges) {}
+  RangeTracker() { }
+  virtual ~RangeTracker() { }
+  virtual void ExtractRanges(std::vector<Range> *ranges) { }
 };
 
 
@@ -39,7 +39,7 @@ public:
     this->to = to;
   }
 
-  virtual void ExtractRanges(std::vector<Range>* ranges) override;
+  virtual void ExtractRanges(std::vector<Range> *ranges) override;
 
 protected:
   size_t from;
@@ -48,15 +48,15 @@ protected:
 
 class SHMRangeTracker : public RangeTracker {
 public:
-  SHMRangeTracker(char* name, size_t size);
+  SHMRangeTracker(char *name, size_t size);
   ~SHMRangeTracker();
 
-  virtual void ExtractRanges(std::vector<Range>* ranges) override;
+  virtual void ExtractRanges(std::vector<Range> *ranges) override;
 
 protected:
-  void ConsolidateRanges(std::vector<Range>& inranges, std::vector<Range>& outranges);
+  void ConsolidateRanges(std::vector<Range> &inranges, std::vector<Range> &outranges);
 
   SharedMemory shm;
-  uint32_t* data;
+  uint32_t *data;
   size_t max_ranges;
 };

@@ -45,9 +45,8 @@ private:
   std::shared_mutex mutex;
 
 public:
-
-  ReadWriteMutex() {}
-  ~ReadWriteMutex() {}
+  ReadWriteMutex() { }
+  ~ReadWriteMutex() { }
 
   //lock data for reading only, other readers possible, but no writers
   void LockRead();
@@ -61,4 +60,3 @@ public:
   //unlocks data after LockWrite
   void UnlockWrite();
 };
-

@@ -20,18 +20,19 @@ limitations under the License.
 #include <windows.h>
 
 
-void CreateThread(void *(*start_routine) (void *), void *arg) {
+void CreateThread(void *(*start_routine)(void *), void *arg) {
   HANDLE thread_handle = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)start_routine, arg, 0, NULL);
   // close the handle immediately to prevent handle leak
-  if(thread_handle) CloseHandle(thread_handle);
+  if (thread_handle) CloseHandle(thread_handle);
 }
 
 #else
 #include <pthread.h>
 
-void CreateThread(void *(*start_routine) (void *), void *arg) {
+void CreateThread(void *(*start_routine)(void *), void *arg) {
   pthread_t thread_id;
   pthread_create(&thread_id, NULL, start_routine, arg);
+  pthread_detach(thread_id);
 }
 
 #endif

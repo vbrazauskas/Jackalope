@@ -16,19 +16,22 @@ limitations under the License.
 
 #pragma once
 
-#include <inttypes.h>
-#include <string>
 #include "coverage.h"
 #include "runresult.h"
+#include <inttypes.h>
+#include <string>
 
 class Instrumentation {
 public:
-  virtual ~Instrumentation() { }
+  virtual ~Instrumentation() {}
 
   virtual void Init(int argc, char **argv) = 0;
-  virtual RunResult Run(int argc, char **argv, uint32_t init_timeout, uint32_t timeout) = 0;
+  virtual RunResult Run(int argc, char **argv, uint32_t init_timeout,
+                        uint32_t timeout) = 0;
 
-  virtual RunResult RunWithCrashAnalysis(int argc, char** argv, uint32_t init_timeout, uint32_t timeout) {
+  virtual RunResult RunWithCrashAnalysis(int argc, char **argv,
+                                         uint32_t init_timeout,
+                                         uint32_t timeout) {
     return Run(argc, argv, init_timeout, timeout);
   }
 
@@ -43,6 +46,5 @@ public:
 
   virtual uint64_t GetReturnValue() { return 0; }
 
-  std::string AnonymizeAddress(void* addr);
+  std::string AnonymizeAddress(void *addr);
 };
-

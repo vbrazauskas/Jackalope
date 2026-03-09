@@ -20,12 +20,12 @@ limitations under the License.
 #include <vector>
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-#include <windows.h>
 #include <direct.h>
+#include <windows.h>
 #else
+#include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <dirent.h>
 #endif
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
@@ -37,4 +37,3 @@ limitations under the License.
 size_t GetFilesInDirectory(std::string directory, std::list<std::string> &list);
 std::string DirJoin(std::string dir1, std::string dir2);
 int CreateDirectory(std::string &directory);
-

@@ -20,16 +20,18 @@ limitations under the License.
 
 class MinimizerContext {
 public:
-  virtual ~MinimizerContext() { }
+  virtual ~MinimizerContext() {}
 };
 
 class Minimizer {
 public:
-  virtual MinimizerContext* CreateContext(Sample* sample) { return NULL; };
+  virtual MinimizerContext *CreateContext(Sample *sample) { return NULL; };
   // should return 0 when minimizing done
-  virtual int MinimizeStep(Sample* sample, MinimizerContext *context) { return 0; };
-  virtual void ReportSuccess(Sample* sample, MinimizerContext* context) { };
-  virtual void ReportFail(Sample* sample, MinimizerContext* context) { };
+  virtual int MinimizeStep(Sample *sample, MinimizerContext *context) {
+    return 0;
+  };
+  virtual void ReportSuccess(Sample *sample, MinimizerContext *context) {};
+  virtual void ReportFail(Sample *sample, MinimizerContext *context) {};
 };
 
 #define TRIM_STEP_INITIAL 16
@@ -42,7 +44,7 @@ public:
 
 class SimpleTrimmer : public Minimizer {
 public:
-  virtual MinimizerContext* CreateContext(Sample* sample);
-  virtual int MinimizeStep(Sample* sample, MinimizerContext* context);
-  virtual void ReportFail(Sample* sample, MinimizerContext* context);
+  virtual MinimizerContext *CreateContext(Sample *sample);
+  virtual int MinimizeStep(Sample *sample, MinimizerContext *context);
+  virtual void ReportFail(Sample *sample, MinimizerContext *context);
 };

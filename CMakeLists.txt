@@ -26,6 +26,9 @@ elseif(ANDROID_ABI)
     set(ARCHITECTURE ${ANDROID_ABI})
     add_definitions(-DARM64)
   endif()
+  if(${ANDROID_TARGET} MATCHES "VM")
+    add_definitions(-DANDROID_VM)
+  endif()  
 elseif(NOT DEFINED ${ARCHITECTURE})
   EXECUTE_PROCESS(COMMAND uname -m COMMAND tr -d '\n' OUTPUT_VARIABLE ARCHITECTURE)
   if(${ARCHITECTURE} MATCHES arm64)
@@ -36,14 +39,6 @@ endif()
 if(UNIX AND NOT APPLE AND NOT ANDROID)
   set(LINUX TRUE)
 endif()
-
-project(test_netmode)
-
-add_executable(test_netmode test_netmode.cpp)
-
-project(test_client)
-
-add_executable(test_client test_client.cpp)
 
 project("fuzzer")
 
@@ -124,10 +119,6 @@ target_link_libraries(fuzzer fuzzerlib)
 
 add_executable(test
   test.cpp
-  )
-  
-add_executable(test_base64
-  test_base64.cpp
   )
   
 if(LINUX)

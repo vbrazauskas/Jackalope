@@ -55,7 +55,7 @@ SanCovInstrumentation::~SanCovInstrumentation() {
 #ifdef __ANDROID__
   FATAL("SanCovInstrumentation is not implemented on Android");
 #else
-  if(cov_shm) {
+  if (cov_shm) {
     munmap(cov_shm, COVERAGE_SHM_SIZE);
     shm_unlink(coverage_shm_name.c_str());
     close(cov_shm_fd);
@@ -79,18 +79,24 @@ void SanCovInstrumentation::Init(int argc, char **argv) {
   additional_env.push_back(std::string("SAMPLE_SHM_ID=") + sample_shm_name);
   additional_env.push_back(std::string("COV_SHM_ID=") + coverage_shm_name);
   additional_env.push_back(std::string("ASAN_OPTIONS=exitcode=") + std::to_string(ASAN_EXIT_STATUS) + ":log_path=" + asan_report_file);
+
+  std::list<char *> env_options;
+  GetOptionAll("-target_env", argc, argv, &env_options);
+  for (auto iter = env_options.begin(); iter != env_options.end(); iter++) {
+    additional_env.push_back(std::string(*iter));
+  }
+
   ComputeEnvp(additional_env);
-  
+
   // set up shmem for coverage
   SetUpShmem();
-  
+
   virgin_bits = (uint8_t *)malloc(COVERAGE_SHM_SIZE);
   memset(virgin_bits, 0xff, COVERAGE_SHM_SIZE);
-  
+
   num_iterations = GetIntOption("-iterations", argc, argv, 1);
-  
+
   mute_child = GetBinaryOption("-mute_child", argc, argv, false);
-  
 }
 
 void SanCovInstrumentation::SetUpShmem() {
@@ -98,28 +104,25 @@ void SanCovInstrumentation::SetUpShmem() {
   FATAL("SanCovInstrumentation is not implemented on Android");
 #else
   int res;
-  
+
   // get shared memory file descriptor (NOT a file)
   cov_shm_fd = shm_open(coverage_shm_name.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-  if (cov_shm_fd == -1)
-  {
+  if (cov_shm_fd == -1) {
     FATAL("Error creating shared memory");
   }
 
   // extend shared memory object as by default it's initialized with size 0
   res = ftruncate(cov_shm_fd, COVERAGE_SHM_SIZE);
-  if (res == -1)
-  {
+  if (res == -1) {
     FATAL("Error creating shared memory");
   }
 
   // map shared memory to process address space
   cov_shm = (coverage_shmem_data *)mmap(NULL, COVERAGE_SHM_SIZE, PROT_WRITE, MAP_SHARED, cov_shm_fd, 0);
-  if (cov_shm == MAP_FAILED)
-  {
+  if (cov_shm == MAP_FAILED) {
     FATAL("Error creating shared memory");
   }
-  
+
   memset(cov_shm, 0, COVERAGE_SHM_SIZE);
 #endif
 }
@@ -127,32 +130,32 @@ void SanCovInstrumentation::SetUpShmem() {
 void SanCovInstrumentation::ComputeEnvp(std::list<std::string> &additional_env) {
   int environ_size = 0;
   char **p = environ;
-  while(*p) {
+  while (*p) {
     environ_size += 1;
     p++;
   }
 
   int i;
   int envp_size = environ_size + additional_env.size();
-  envp = (char**)malloc(sizeof(char*) * (envp_size + 1 ));
-  for(i = 0; i < environ_size; ++i) {
-    envp[i] = (char*)malloc(strlen(environ[i]) + 1);
+  envp = (char **)malloc(sizeof(char *) * (envp_size + 1));
+  for (i = 0; i < environ_size; ++i) {
+    envp[i] = (char *)malloc(strlen(environ[i]) + 1);
     strcpy(envp[i], environ[i]);
   }
 
-  for(auto iter = additional_env.begin(); iter != additional_env.end(); iter++) {
-    envp[i] = (char*)malloc(iter->size() + 1);
+  for (auto iter = additional_env.begin(); iter != additional_env.end(); iter++) {
+    envp[i] = (char *)malloc(iter->size() + 1);
     strcpy(envp[i], iter->c_str());
     i++;
   }
-  
+
   envp[envp_size] = NULL;
 }
 
 
-void SanCovInstrumentation::StartTarget(int argc, char** argv) {
-  int crpipe[2] = { 0, 0 };          // control pipe child -> reprl
-  int cwpipe[2] = { 0, 0 };          // control pipe reprl -> child
+void SanCovInstrumentation::StartTarget(int argc, char **argv) {
+  int crpipe[2] = {0, 0}; // control pipe child -> reprl
+  int cwpipe[2] = {0, 0}; // control pipe reprl -> child
 
   if (pipe(crpipe) != 0) {
     FATAL("Error creating pipe");
@@ -165,19 +168,18 @@ void SanCovInstrumentation::StartTarget(int argc, char** argv) {
   ctrl_out = cwpipe[1];
   fcntl(ctrl_in, F_SETFD, FD_CLOEXEC);
   fcntl(ctrl_out, F_SETFD, FD_CLOEXEC);
-  
+
   int pid = fork();
   if (pid == 0) {
     if (dup2(cwpipe[0], FUZZ_CHILD_CTRL_IN) < 0 ||
-        dup2(crpipe[1], FUZZ_CHILD_CTRL_OUT) < 0)
-    {
+        dup2(crpipe[1], FUZZ_CHILD_CTRL_OUT) < 0) {
       FATAL("dup2 failed in the child");
     }
 
     close(cwpipe[0]);
     close(crpipe[1]);
 
-    if(mute_child) {
+    if (mute_child) {
       int devnull = open("/dev/null", O_RDWR);
       dup2(devnull, 1);
       dup2(devnull, 2);
@@ -196,7 +198,7 @@ void SanCovInstrumentation::StartTarget(int argc, char** argv) {
       }
       close(i);
     }
-    
+
 
     execve(argv[0], argv, envp);
 
@@ -205,58 +207,62 @@ void SanCovInstrumentation::StartTarget(int argc, char** argv) {
 
   close(crpipe[1]);
   close(cwpipe[0]);
-    
+
   if (pid < 0) {
     FATAL("Failed to fork");
   }
-  
+
   this->pid = pid;
-  
+
   cur_iteration = 0;
 }
 
 void SanCovInstrumentation::CleanupChild() {
-    if (!pid) return;
-    pid = 0;
-    close(ctrl_in);
-    close(ctrl_out);
+  if (!pid) return;
+  pid = 0;
+  close(ctrl_in);
+  close(ctrl_out);
 }
 
 void SanCovInstrumentation::Kill() {
-    if (!pid) return;
-    int status;
-    kill(pid, SIGKILL);
-    waitpid(pid, &status, 0);
-    CleanupChild();
+  if (!pid) return;
+  int status;
+  kill(pid, SIGKILL);
+  waitpid(pid, &status, 0);
+  CleanupChild();
 }
 
 RunResult SanCovInstrumentation::GetStatus(uint32_t timeout, int expected_status) {
   struct pollfd fds = {.fd = ctrl_in, .events = POLLIN, .revents = 0};
   int res = poll(&fds, 1, timeout);
-  if (res == 0) return HANG;
-  else if (res != 1) return OTHER_ERROR;
-  
+  if (res == 0)
+    return HANG;
+  else if (res != 1)
+    return OTHER_ERROR;
+
   int status = 0;
   ssize_t rv = read(ctrl_in, &status, 1);
-  if(rv < 0) return OTHER_ERROR;
-  else if(rv != 1) return CRASH;
-  
-  if(status != expected_status) {
+  if (rv < 0)
+    return OTHER_ERROR;
+  else if (rv != 1)
+    return CRASH;
+
+  if (status != expected_status) {
     return OTHER_ERROR;
   }
-  
-  if(status == 'd') {  
+
+  if (status == 'd') {
     res = poll(&fds, 1, timeout);
     if (res != 1) return OTHER_ERROR;
-  
+
     uint64_t return_value;
     ssize_t rv = read(ctrl_in, &return_value, sizeof(return_value));
-    if(rv != sizeof(return_value)) return OTHER_ERROR;
-    
+    if (rv != sizeof(return_value)) return OTHER_ERROR;
+
     this->return_value = return_value;
   }
 
-  return OK;  
+  return OK;
 }
 
 RunResult SanCovInstrumentation::Run(int argc, char **argv, uint32_t init_timeout, uint32_t timeout) {
@@ -266,50 +272,50 @@ RunResult SanCovInstrumentation::Run(int argc, char **argv, uint32_t init_timeou
 
   RunResult poll_result;
 
-  if(!pid) {
+  if (!pid) {
     StartTarget(argc, argv);
   } else {
     write(ctrl_out, "c", 1);
   }
-  
+
   poll_result = GetStatus(init_timeout, 'k');
 
-  if(poll_result != OK) {
+  if (poll_result != OK) {
     WARN("Target function not reached, retrying with a clean process\n");
     Kill();
     StartTarget(argc, argv);
     poll_result = GetStatus(init_timeout, 'k');
-    if(poll_result != OK) {
+    if (poll_result != OK) {
       FATAL("Repetedly failing to reach target function");
     }
   }
-  
+
   write(ctrl_out, "c", 1);
-  
+
   poll_result = GetStatus(timeout, 'd');
-  
-  if(poll_result == OK) {
+
+  if (poll_result == OK) {
     cur_iteration++;
     return OK;
-  } else if(poll_result == CRASH) {
+  } else if (poll_result == CRASH) {
     // try getting the exit status
     // (potentially multiple times)
     size_t retries = (timeout * 10);
     int success = 0;
     int status;
     int crashpid = pid;
-    for(size_t i = 0; i < retries; i++) {
-       success = waitpid(pid, &status, WNOHANG) == pid;
-       if(success) break;
-       usleep(100);
+    for (size_t i = 0; i < retries; i++) {
+      success = waitpid(pid, &status, WNOHANG) == pid;
+      if (success) break;
+      usleep(100);
     }
-    if(!success) {
+    if (!success) {
       crash_description = std::string("unexpected_error_") + GetTimeStr();
       Kill();
       return CRASH;
     }
     CleanupChild();
-    if(WIFSIGNALED(status)) {
+    if (WIFSIGNALED(status)) {
       int signal = WTERMSIG(status);
       crash_description = std::string("signal_") + std::to_string(signal) + std::string("_") + GetTimeStr();
       return CRASH;
@@ -349,10 +355,10 @@ std::string SanCovInstrumentation::GetTimeStr() {
 void SanCovInstrumentation::GetCoverage(Coverage &coverage, bool clear_coverage) {
   std::set<uint64_t> new_offsets;
 
-  uint64_t* current = (uint64_t*)cov_shm->edges;
-  uint64_t* end = (uint64_t*)(cov_shm->edges + ((cov_shm->num_edges + 7) / 8));
-  uint64_t* virgin = (uint64_t*)virgin_bits;
-  
+  uint64_t *current = (uint64_t *)cov_shm->edges;
+  uint64_t *end = (uint64_t *)(cov_shm->edges + ((cov_shm->num_edges + 7) / 8));
+  uint64_t *virgin = (uint64_t *)virgin_bits;
+
   while (current < end) {
     if (*current && unlikely(*current & *virgin)) {
       // New edge(s) found!
@@ -368,16 +374,16 @@ void SanCovInstrumentation::GetCoverage(Coverage &coverage, bool clear_coverage)
     virgin++;
   }
 
-  if(new_offsets.empty()) return;
-  
+  if (new_offsets.empty()) return;
+
   ModuleCoverage *target_coverage = GetModuleCoverage(coverage, module_name);
-  if(!target_coverage) {
+  if (!target_coverage) {
     coverage.push_back({module_name, new_offsets});
   } else {
     target_coverage->offsets.insert(new_offsets.begin(), new_offsets.end());
   }
 
-  if(clear_coverage) ClearCoverage();  
+  if (clear_coverage) ClearCoverage();
 }
 
 bool SanCovInstrumentation::HasNewCoverage() {
@@ -393,9 +399,9 @@ void SanCovInstrumentation::ClearCoverage() {
 
 void SanCovInstrumentation::IgnoreCoverage(Coverage &coverage) {
   ModuleCoverage *target_coverage = GetModuleCoverage(coverage, module_name);
-  if(!target_coverage) return;
-  
-  for(auto iter = target_coverage->offsets.begin(); iter != target_coverage->offsets.end(); iter++) {
+  if (!target_coverage) return;
+
+  for (auto iter = target_coverage->offsets.begin(); iter != target_coverage->offsets.end(); iter++) {
     clear_edge(virgin_bits, *iter);
   }
 }
@@ -404,7 +410,7 @@ std::string SanCovInstrumentation::GetAsanCrashDesc(int crashpid) {
   // very basic parsing of ASAN crash report
   std::string filename = asan_report_file + "." + std::to_string(crashpid);
   FILE *fp = fopen(filename.c_str(), "rb");
-  if(!fp) {
+  if (!fp) {
     WARN("Error opening ASAN report at %s", filename.c_str());
     return std::string("ASAN_") + GetTimeStr();
   }
@@ -415,25 +421,28 @@ std::string SanCovInstrumentation::GetAsanCrashDesc(int crashpid) {
   fread(buf, 1, size, fp);
   buf[size] = 0;
   fclose(fp);
-  
+
   unlink(filename.c_str());
-  
+
+  std::string reason;
+  if (strstr(buf, "AddressSanitizer: stack-overflow on address")) {
+    reason = "stack-overflow_";
+  }
+
   char *pc = strstr(buf, "pc 0x");
-  if(!pc) {
+  if (!pc) {
     free(buf);
-    return std::string("ASAN_") + GetTimeStr();
+    return std::string("ASAN_") + reason + GetTimeStr();
   }
 
   char *hex = pc + 3;
   char *hexend = hex + 2;
-  while(isalnum(*hexend)) hexend++;
+  while (isalnum(*hexend))
+    hexend++;
   *hexend = 0;
 
   unsigned long addres = strtoul(hex, NULL, 16);
 
-  free(buf);  
-  return std::string("ASAN_") + AnonymizeAddress((void *)addres);
+  free(buf);
+  return std::string("ASAN_") + reason + AnonymizeAddress((void *)addres);
 }
-
-
-

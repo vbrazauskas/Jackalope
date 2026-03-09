@@ -17,8 +17,8 @@ limitations under the License.
 #pragma once
 
 #include <stdio.h>
-#include <unordered_map>
 #include <string>
+#include <unordered_map>
 
 #include "mutex.h"
 
@@ -33,11 +33,11 @@ public:
   Sample();
   ~Sample();
   Sample(const Sample &in);
-  Sample& operator= (const Sample &in);
+  Sample &operator=(const Sample &in);
 
   void Clear();
 
-  int Save(const char * filename);
+  int Save(const char *filename);
 
   int Save();
   int Load();
@@ -45,9 +45,9 @@ public:
   void FreeMemory();
   void EnsureLoaded();
 
-  void Save(FILE * fp);
+  void Save(FILE *fp);
 
-  int Load(const char * filename);
+  int Load(const char *filename);
 
   void Init(const char *data, size_t size);
   void Init(size_t size);
@@ -55,10 +55,10 @@ public:
   void Append(char *data, size_t size);
 
   void Trim(size_t new_size);
-  
+
   void Resize(size_t new_size);
-  
-  void Crop(size_t from, size_t to, Sample* out);
+
+  void Crop(size_t from, size_t to, Sample *out);
 
   size_t FindFirstDiff(Sample &other);
 
@@ -70,27 +70,24 @@ public:
 // that differs from the samples seen so far
 class SampleTrie {
 public:
-  SampleTrie() {
-    root = NULL;
-  }
-  
+  SampleTrie() { root = NULL; }
+
   size_t AddSample(Sample *sample);
 
 protected:
   struct SampleTrieNode {
     SampleTrieNode();
     ~SampleTrieNode();
-    
+
     void InitConstantPart(Sample *sample, size_t from, size_t to);
 
     char *constant_part;
     size_t constant_part_size;
 
-    std::unordered_map<unsigned char, SampleTrieNode*> children;
+    std::unordered_map<unsigned char, SampleTrieNode *> children;
     bool leaf;
   };
-  
+
   static Mutex sample_trie_mutex;
   SampleTrieNode *root;
 };
-

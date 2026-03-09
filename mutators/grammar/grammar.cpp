@@ -10,14 +10,14 @@
 using namespace std;
 
 Grammar::BinaryRW::BinaryRW() {
-  bytes = (unsigned char*)malloc(BINARY_RW_INITIAL_SIZE);
+  bytes = (unsigned char *)malloc(BINARY_RW_INITIAL_SIZE);
   size_allocated = BINARY_RW_INITIAL_SIZE;
   size_current = 0;
   read_pos = 0;
 }
 
-Grammar::BinaryRW::BinaryRW(size_t size, unsigned char* data) {
-  bytes = (unsigned char*)malloc(size);
+Grammar::BinaryRW::BinaryRW(size_t size, unsigned char *data) {
+  bytes = (unsigned char *)malloc(size);
   memcpy(bytes, data, size);
   size_allocated = size;
   size_current = size;
@@ -28,10 +28,10 @@ Grammar::BinaryRW::~BinaryRW() {
   if (bytes) free(bytes);
 }
 
-void Grammar::BinaryRW::WriteData(unsigned char* data, size_t size) {
+void Grammar::BinaryRW::WriteData(unsigned char *data, size_t size) {
   while (size_current + size > size_allocated) {
     size_allocated *= 2;
-    bytes = (unsigned char*)realloc(bytes, size_allocated);
+    bytes = (unsigned char *)realloc(bytes, size_allocated);
   }
   memcpy(bytes + size_current, data, size);
   size_current += size;
@@ -42,14 +42,14 @@ void Grammar::BinaryRW::WriteSize(size_t size) {
   WriteData((unsigned char *)&size64, sizeof(size64));
 }
 
-void Grammar::BinaryRW::WriteString(std::string* s) {
-  unsigned char* data = (unsigned char *)s->data();
+void Grammar::BinaryRW::WriteString(std::string *s) {
+  unsigned char *data = (unsigned char *)s->data();
   size_t size = s->size();
   WriteSize(size);
   WriteData(data, size);
 }
 
-int Grammar::BinaryRW::ReadData(unsigned char* data, size_t size) {
+int Grammar::BinaryRW::ReadData(unsigned char *data, size_t size) {
   if (read_pos + size > size_current) {
     return 0;
   }
@@ -60,12 +60,12 @@ int Grammar::BinaryRW::ReadData(unsigned char* data, size_t size) {
 
 int Grammar::BinaryRW::ReadSize(size_t *size) {
   uint64_t size64;
-  if (!ReadData((unsigned char*)&size64, sizeof(size64))) return 0;
+  if (!ReadData((unsigned char *)&size64, sizeof(size64))) return 0;
   *size = (size_t)size64;
   return 1;
 }
 
-int Grammar::BinaryRW::ReadString(std::string* s) {
+int Grammar::BinaryRW::ReadString(std::string *s) {
   size_t size;
   if (!ReadSize(&size)) return 0;
   if (read_pos + size > size_current) {
@@ -98,12 +98,12 @@ Grammar::TreeNode::TreeNode(const TreeNode &other) {
   }
 
   for (auto iter = other.children.begin(); iter != other.children.end(); iter++) {
-    TreeNode* child = new TreeNode(**iter);
+    TreeNode *child = new TreeNode(**iter);
     this->children.push_back(child);
   }
 }
 
-Grammar::TreeNode& Grammar::TreeNode::operator=(const TreeNode& other) {
+Grammar::TreeNode &Grammar::TreeNode::operator=(const TreeNode &other) {
   Clear();
 
   this->type = other.type;
@@ -114,14 +114,14 @@ Grammar::TreeNode& Grammar::TreeNode::operator=(const TreeNode& other) {
   }
 
   for (auto iter = other.children.begin(); iter != other.children.end(); iter++) {
-    TreeNode* child = new TreeNode(**iter);
+    TreeNode *child = new TreeNode(**iter);
     this->children.push_back(child);
   }
 
   return *this;
 }
 
-void Grammar::TreeNode::Replace(TreeNode* other) {
+void Grammar::TreeNode::Replace(TreeNode *other) {
   Clear();
 
   this->type = other->type;
@@ -142,7 +142,7 @@ size_t Grammar::TreeNode::NumNodes() {
   size_t ret = 1;
 
   for (auto iter = children.begin(); iter != children.end(); iter++) {
-    Grammar::TreeNode* child = *iter;
+    Grammar::TreeNode *child = *iter;
     ret += child->NumNodes();
   }
 
@@ -161,9 +161,9 @@ Grammar::Grammar() {
 }
 
 Grammar::~Grammar() {
-  for(auto pair : symbols)
+  for (auto pair : symbols)
     delete pair.second;
-  for(auto pair : string_cache)
+  for (auto pair : string_cache)
     delete pair.second;
 }
 
@@ -181,7 +181,8 @@ int Grammar::HexStringToString(std::string &hex, std::string &out) {
       cur_value = c - 'a' + 10;
     else if ('A' <= c && c <= 'F')
       cur_value = c - 'A' + 10;
-    else return 0;
+    else
+      return 0;
 
     if (i % 2) {
       c = (prev_value << 4) + cur_value;
@@ -237,10 +238,10 @@ int Grammar::CheckGrammar() {
 void Grammar::AnalyzeGrammar() {
   int ret = 1;
   for (auto iter = symbols.begin(); iter != symbols.end(); iter++) {
-    Symbol* symbol = iter->second;
+    Symbol *symbol = iter->second;
     symbol->can_be_empty = 0;
     for (auto iter2 = symbol->generators.begin(); iter2 != symbol->generators.end(); iter2++) {
-      Rule* rule = &(*iter2);
+      Rule *rule = &(*iter2);
       if (rule->parts.empty()) {
         symbol->can_be_empty = 1;
         break;
@@ -249,9 +250,9 @@ void Grammar::AnalyzeGrammar() {
   }
 }
 
-int Grammar::RulePart::SetAttributes(std::unordered_map<std::string, std::string>& attributes) {
+int Grammar::RulePart::SetAttributes(std::unordered_map<std::string, std::string> &attributes) {
   this->attributes = attributes;
-  
+
   // process common attributes
   auto iter = attributes.find("id");
   if (iter != attributes.end()) {
@@ -270,8 +271,7 @@ int Grammar::RulePart::SetAttributes(std::unordered_map<std::string, std::string
 }
 
 int Grammar::AddRulePart(Grammar::Rule *rule, Grammar::NodeType type, std::string &value,
-  std::unordered_map<std::string, std::string>& attributes)
-{
+                         std::unordered_map<std::string, std::string> &attributes) {
   RulePart newpart;
   if (type == SYMBOLTYPE) {
     // see if we can convert it to a string
@@ -296,7 +296,7 @@ int Grammar::AddRulePart(Grammar::Rule *rule, Grammar::NodeType type, std::strin
   } else {
     // check if we can merge this with the previous string
     if (rule->parts.size()) {
-      RulePart * lastpart = &rule->parts[rule->parts.size() - 1];
+      RulePart *lastpart = &rule->parts[rule->parts.size() - 1];
       if (lastpart->type == STRINGTYPE) {
         lastpart->value.append(value);
         return 1;
@@ -356,8 +356,7 @@ int Grammar::ParseGrammarLine(string &line, int lineno) {
   while (1) {
     switch (state) {
 
-    case LINESTART:
-    {
+    case LINESTART: {
       switch (*str) {
       case 0x20:
       case 0x09:
@@ -370,17 +369,17 @@ int Grammar::ParseGrammarLine(string &line, int lineno) {
         ret = 0;
         break;
       }
-    }
-    break;
+    } break;
 
-    case GENERATORSYMBOL:
-    {
+    case GENERATORSYMBOL: {
       switch (*str) {
       case '>':
         state = GENERATORSYMBOLEND;
         symbolname.assign(symbolstart, str - symbolstart);
-        if (symbolname.empty()) ret = 0;
-        else newrule.generates = symbolname;
+        if (symbolname.empty())
+          ret = 0;
+        else
+          newrule.generates = symbolname;
         break;
       case 0:
         ret = 0;
@@ -388,11 +387,9 @@ int Grammar::ParseGrammarLine(string &line, int lineno) {
       default:
         break;
       }
-    }
-    break;
+    } break;
 
-    case GENERATORSYMBOLEND:
-    {
+    case GENERATORSYMBOLEND: {
       switch (*str) {
       case 0x20:
       case 0x09:
@@ -404,11 +401,9 @@ int Grammar::ParseGrammarLine(string &line, int lineno) {
         ret = 0;
         break;
       }
-    }
-    break;
+    } break;
 
-    case EQUAL:
-    {
+    case EQUAL: {
       switch (*str) {
       case 0x20:
       case 0x09:
@@ -426,11 +421,9 @@ int Grammar::ParseGrammarLine(string &line, int lineno) {
         symbolstart = str;
         break;
       }
-    }
-    break;
+    } break;
 
-    case EQUALSPACE:
-    {
+    case EQUALSPACE: {
       switch (*str) {
       case '<':
         state = SYMBOL;
@@ -444,11 +437,9 @@ int Grammar::ParseGrammarLine(string &line, int lineno) {
         symbolstart = str;
         break;
       }
-    }
-    break;
+    } break;
 
-    case SYMBOL:
-    {
+    case SYMBOL: {
       switch (*str) {
       case 0x20:
       case 0x09:
@@ -468,11 +459,9 @@ int Grammar::ParseGrammarLine(string &line, int lineno) {
       default:
         break;
       }
-    }
-    break;
+    } break;
 
-    case SYMBOLSPACE:
-    {
+    case SYMBOLSPACE: {
       switch (*str) {
       case 0x20:
       case 0x09:
@@ -489,11 +478,9 @@ int Grammar::ParseGrammarLine(string &line, int lineno) {
         state = ATTRNAME;
         break;
       }
-    }
-    break;
+    } break;
 
-    case ATTRNAME:
-    {
+    case ATTRNAME: {
       switch (*str) {
       case 0x20:
       case 0x09:
@@ -521,11 +508,9 @@ int Grammar::ParseGrammarLine(string &line, int lineno) {
       default:
         break;
       }
-    }
-    break;
+    } break;
 
-    case ATTRVALUE:
-    {
+    case ATTRVALUE: {
       switch (*str) {
       case 0x20:
       case 0x09:
@@ -545,11 +530,9 @@ int Grammar::ParseGrammarLine(string &line, int lineno) {
       default:
         break;
       }
-    }
-    break;
+    } break;
 
-    case SYMBOLEND:
-    {
+    case SYMBOLEND: {
       switch (*str) {
       case '<':
         state = SYMBOL;
@@ -562,11 +545,9 @@ int Grammar::ParseGrammarLine(string &line, int lineno) {
         symbolstart = str;
         break;
       }
-    }
-    break;
+    } break;
 
-    case STRING:
-    {
+    case STRING: {
       switch (*str) {
       case '<':
         symbolname.assign(symbolstart, str - symbolstart);
@@ -581,8 +562,7 @@ int Grammar::ParseGrammarLine(string &line, int lineno) {
       default:
         break;
       }
-    }
-    break;
+    } break;
 
     default:
       break;
@@ -618,14 +598,14 @@ Grammar::TreeNode *Grammar::GenerateTree(Symbol *symbol, PRNG *prng, int depth) 
 
   //printf("Generating %s\n", symbol->name.c_str());
 
-  TreeNode* node = new TreeNode();
+  TreeNode *node = new TreeNode();
   node->type = SYMBOLTYPE;
   node->symbol = symbol;
 
   if (symbol->repeat) {
     while (1) {
       if (prng->RandReal() > REPEAT_PROBABILITY) break;
-      TreeNode* child = GenerateTree(symbol->repeat_symbol, prng, depth + 1);
+      TreeNode *child = GenerateTree(symbol->repeat_symbol, prng, depth + 1);
       if (!child) {
         node->Clear();
         delete node;
@@ -640,7 +620,7 @@ Grammar::TreeNode *Grammar::GenerateTree(Symbol *symbol, PRNG *prng, int depth) 
   Rule &generator = symbol->generators[prng->Rand() % num_generators];
 
   RulePart *part;
-  for(size_t part_index = 0; part_index < generator.parts.size(); part_index++) {
+  for (size_t part_index = 0; part_index < generator.parts.size(); part_index++) {
     part = &(generator.parts[part_index]);
 
     if (part->type == SYMBOLTYPE) {
@@ -655,13 +635,13 @@ Grammar::TreeNode *Grammar::GenerateTree(Symbol *symbol, PRNG *prng, int depth) 
           }
         }
         if (found) {
-          TreeNode* child = new TreeNode(*node->children[found_index]);
+          TreeNode *child = new TreeNode(*node->children[found_index]);
           node->children.push_back(child);
           continue;
         }
       }
 
-      TreeNode* child = GenerateTree(part->symbol, prng, depth + 1);
+      TreeNode *child = GenerateTree(part->symbol, prng, depth + 1);
       if (!child) {
         node->Clear();
         delete node;
@@ -685,8 +665,8 @@ Grammar::TreeNode *Grammar::GenerateTree(const char *symbol, PRNG *prng) {
   return GenerateTree(s, prng);
 }
 
-int Grammar::GenerateString(const char* symbol, PRNG* prng, std::string *out) {
-  Grammar::TreeNode* tree = GenerateTree(symbol, prng);
+int Grammar::GenerateString(const char *symbol, PRNG *prng, std::string *out) {
+  Grammar::TreeNode *tree = GenerateTree(symbol, prng);
   if (!tree) return 0;
   ToString(tree, *out);
   delete tree;
@@ -704,7 +684,7 @@ void Grammar::ToString(TreeNode *tree, std::string &out) {
   }
 }
 
-void Grammar::EncodeTree(TreeNode* tree, BinaryRW* rw) {
+void Grammar::EncodeTree(TreeNode *tree, BinaryRW *rw) {
   unsigned char type = (char)tree->type;
   rw->WriteData(&type, 1);
   if (tree->type == STRINGTYPE) {
@@ -718,11 +698,11 @@ void Grammar::EncodeTree(TreeNode* tree, BinaryRW* rw) {
   }
 }
 
-Grammar::TreeNode* Grammar::DecodeTree(BinaryRW* rw) {
+Grammar::TreeNode *Grammar::DecodeTree(BinaryRW *rw) {
   unsigned char type;
-  if(!rw->ReadData(&type, 1)) return NULL;
+  if (!rw->ReadData(&type, 1)) return NULL;
 
-  TreeNode* tree = new TreeNode();
+  TreeNode *tree = new TreeNode();
   tree->type = (NodeType)type;
 
   if (tree->type == STRINGTYPE) {
@@ -752,7 +732,7 @@ Grammar::TreeNode* Grammar::DecodeTree(BinaryRW* rw) {
   }
 
   for (size_t i = 0; i < nchildren; i++) {
-    TreeNode* child = DecodeTree(rw);
+    TreeNode *child = DecodeTree(rw);
     if (!child) {
       delete tree;
       return NULL;
@@ -763,32 +743,32 @@ Grammar::TreeNode* Grammar::DecodeTree(BinaryRW* rw) {
   return tree;
 }
 
-std::string* Grammar::GetStringFromCache(std::string& s) {
+std::string *Grammar::GetStringFromCache(std::string &s) {
   auto iter = string_cache.find(s);
   if (iter == string_cache.end()) {
-    string* sp = new string(s);
+    string *sp = new string(s);
     string_cache[s] = sp;
     return sp;
   }
   return iter->second;
 }
 
-void Grammar::EncodeSample(TreeNode* tree, Sample* sample) {
+void Grammar::EncodeSample(TreeNode *tree, Sample *sample) {
   std::string sample_string;
   ToString(tree, sample_string);
   BinaryRW rw;
   rw.WriteString(&sample_string);
   EncodeTree(tree, &rw);
-  sample->Init((char*)rw.GetData(), rw.GetSize());
+  sample->Init((char *)rw.GetData(), rw.GetSize());
 }
 
-Grammar::TreeNode* Grammar::DecodeSample(Sample* sample) {
-  BinaryRW rw(sample->size, (unsigned char*)sample->bytes);
+Grammar::TreeNode *Grammar::DecodeSample(Sample *sample) {
+  BinaryRW rw(sample->size, (unsigned char *)sample->bytes);
   std::string sample_string;
   if (!rw.ReadString(&sample_string)) {
     return NULL;
   }
-  Grammar::TreeNode* tree = DecodeTree(&rw);
+  Grammar::TreeNode *tree = DecodeTree(&rw);
   if (!tree) {
     return NULL;
   }

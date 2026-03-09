@@ -23,14 +23,14 @@ limitations under the License.
 class SharedMemory {
 public:
   SharedMemory();
-  SharedMemory(char* name, size_t size);
+  SharedMemory(char *name, size_t size);
   ~SharedMemory();
 
-  void Open(char* name, size_t size);
+  void Open(char *name, size_t size);
   void Close();
 
   size_t GetSize() { return size; }
-  unsigned char* GetData() { return shm; }
+  unsigned char *GetData() { return shm; }
 
 protected:
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
@@ -40,5 +40,5 @@ protected:
 #endif
   char *name;
   size_t size;
-  unsigned char* shm;
+  unsigned char *shm;
 };

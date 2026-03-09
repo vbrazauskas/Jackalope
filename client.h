@@ -16,17 +16,17 @@ limitations under the License.
 
 #pragma once
 
-#include <list>
-#include <string>
+#include "prng.h"
 #include "sample.h"
 #include "server.h"
-#include "prng.h"
+#include <list>
+#include <string>
 
 class CoverageClient : public ServerCommon {
 public:
-  CoverageClient() : last_timestamp(0), num_samples(0),
-    have_server(false), server_port(DEFAULT_SERVER_PORT)
-  {
+  CoverageClient()
+      : last_timestamp(0), num_samples(0), have_server(false),
+        server_port(DEFAULT_SERVER_PORT) {
     PRNG::SecureRandom(&client_id, sizeof(client_id));
   }
   ~CoverageClient();
@@ -37,8 +37,8 @@ public:
   int GetUpdates(std::list<Sample *> &new_samples, uint64_t total_execs);
   int ReportCrash(Sample *crash, std::string &crash_desc);
 
-  void SaveState(FILE* fp);
-  void LoadState(FILE* fp);
+  void SaveState(FILE *fp);
+  void LoadState(FILE *fp);
 
 private:
   int TryConnectToServer();

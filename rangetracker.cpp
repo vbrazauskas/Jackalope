@@ -19,11 +19,11 @@ limitations under the License.
 
 #include <algorithm>
 
-void ConstantRangeTracker::ExtractRanges(std::vector<Range>* ranges) {
-  ranges->push_back({ from, to });
+void ConstantRangeTracker::ExtractRanges(std::vector<Range> *ranges) {
+  ranges->push_back({from, to});
 }
 
-SHMRangeTracker::SHMRangeTracker(char* name, size_t size) {
+SHMRangeTracker::SHMRangeTracker(char *name, size_t size) {
   shm.Open(name, size);
   data = (uint32_t *)shm.GetData();
   data[0] = 0;
@@ -34,9 +34,10 @@ SHMRangeTracker::~SHMRangeTracker() {
   shm.Close();
 }
 
-void SHMRangeTracker::ExtractRanges(std::vector<Range>* ranges) {
-  uint32_t* buf = data;
-  size_t numranges = *buf; buf++;
+void SHMRangeTracker::ExtractRanges(std::vector<Range> *ranges) {
+  uint32_t *buf = data;
+  size_t numranges = *buf;
+  buf++;
 
   if (!numranges) return;
 
@@ -48,20 +49,22 @@ void SHMRangeTracker::ExtractRanges(std::vector<Range>* ranges) {
   std::vector<Range> tmpranges;
   tmpranges.resize(numranges);
   for (size_t i = 0; i < numranges; i++) {
-    tmpranges[i].from = *buf; buf++;
-    tmpranges[i].to = *buf; buf++;
+    tmpranges[i].from = *buf;
+    buf++;
+    tmpranges[i].to = *buf;
+    buf++;
   }
 
   ConsolidateRanges(tmpranges, *ranges);
 }
 
-void SHMRangeTracker::ConsolidateRanges(std::vector<Range>& inranges, std::vector<Range>& outranges) {
+void SHMRangeTracker::ConsolidateRanges(std::vector<Range> &inranges, std::vector<Range> &outranges) {
   if (inranges.empty()) return;
 
   std::sort(inranges.begin(), inranges.end());
 
-  Range* lastrange = NULL;
-  Range* currange = NULL;
+  Range *lastrange = NULL;
+  Range *currange = NULL;
 
   outranges.push_back(inranges[0]);
 

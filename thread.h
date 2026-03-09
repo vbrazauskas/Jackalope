@@ -16,4 +16,4 @@ limitations under the License.
 
 #pragma once
 
-void CreateThread(void *(*start_routine) (void *), void *arg);
+void CreateThread(void *(*start_routine)(void *), void *arg);

@@ -81,7 +81,7 @@ int ServerCommon::RecvSample(socket_type sock, Sample &sample) {
   if (!Read(sock, &sample_size, sizeof(sample_size))) {
     return 0;
   }
-  char *new_bytes = (char*)malloc(sample_size);
+  char *new_bytes = (char *)malloc(sample_size);
   if (!new_bytes) return 0;
   if (!Read(sock, new_bytes, sample_size)) {
     free(new_bytes);
@@ -133,7 +133,7 @@ int ServerCommon::SendCoverage(socket_type sock, Coverage &coverage) {
 
     free(offsets);
   }
-  
+
   send(sock, "N", 1, 0);
 
   return 1;
@@ -159,8 +159,8 @@ int ServerCommon::RecvCoverage(socket_type sock, Coverage &coverage) {
     }
 
     ModuleCoverage *module_coverage = GetModuleCoverage(coverage, module_name);
-    if(!module_coverage) {
-      coverage.push_back({ module_name, {} });
+    if (!module_coverage) {
+      coverage.push_back({module_name, {}});
       module_coverage = GetModuleCoverage(coverage, module_name);
     }
 
@@ -184,7 +184,7 @@ int ServerCommon::RecvCoverage(socket_type sock, Coverage &coverage) {
       module_coverage->offsets.insert(offsets[i]);
     }
   }
-  
+
   return 1;
 }
 
@@ -209,9 +209,11 @@ uint64_t CoverageServer::GetIndex(std::vector<TimestampIndex> &timestamps, uint6
   }
 
   if (timestamps[m].timestamp > timestamp) {
-    while ((m > 0) && (timestamps[m - 1].timestamp > timestamp)) m--;
+    while ((m > 0) && (timestamps[m - 1].timestamp > timestamp))
+      m--;
   } else {
-    while ((m < (int64_t)(timestamps.size() - 1)) && (timestamps[m].timestamp <= timestamp)) m++;
+    while ((m < (int64_t)(timestamps.size() - 1)) && (timestamps[m].timestamp <= timestamp))
+      m++;
   }
 
   if (timestamps[m].timestamp <= timestamp) {
@@ -291,14 +293,14 @@ bool CoverageServer::OnNewCoverage(Coverage *client_coverage) {
 
 int CoverageServer::ReportNewCoverage(socket_type sock) {
   char command;
-  
+
   Coverage client_coverage;
   Coverage new_client_coverage;
 
-  if(!RecvCoverage(sock, client_coverage)) {
+  if (!RecvCoverage(sock, client_coverage)) {
     return 0;
   }
-  
+
   mutex.LockRead();
   if (!HasNewCoverage(&client_coverage, &new_client_coverage)) {
     mutex.UnlockRead();
@@ -339,10 +341,10 @@ int CoverageServer::ReportNewCoverage(socket_type sock) {
   }
 
   if (!new_samples.empty()) {
-    corpus.timestamps.push_back({ server_timestamp, corpus.samples.size() });
+    corpus.timestamps.push_back({server_timestamp, corpus.samples.size()});
   }
 
-  for(auto iter = new_samples.begin(); iter != new_samples.end(); iter++) {
+  for (auto iter = new_samples.begin(); iter != new_samples.end(); iter++) {
     char fileindex[20];
     sprintf(fileindex, "%05zu", corpus.samples.size());
     std::string sample_file = DirJoin(sample_dir, std::string("sample_") + fileindex);
@@ -358,7 +360,7 @@ int CoverageServer::ReportNewCoverage(socket_type sock) {
   return 1;
 }
 
-bool CoverageServer::CheckFilename(std::string& filename) {
+bool CoverageServer::CheckFilename(std::string &filename) {
   size_t len = filename.length();
   for (size_t i = 0; i < len; i++) {
     char c = filename[i];
@@ -366,8 +368,7 @@ bool CoverageServer::CheckFilename(std::string& filename) {
         (c >= 'a' && c <= 'z') ||
         (c >= 'A' && c <= 'Z') ||
         (c == '-') ||
-        (c == '_'))
-    {
+        (c == '_')) {
       continue;
     } else {
       return false;
@@ -403,28 +404,28 @@ int CoverageServer::ReportCrash(socket_type sock) {
       WARN("Invalid characters in crash filename");
       continue;
     }
-    
+
     bool should_save_crash = false;
     int duplicates = 0;
-    
+
     crash_mutex.Lock();
     num_crashes++;
 
     auto crash_it = unique_crashes.find(crash_desc);
-    if(crash_it == unique_crashes.end()) {
+    if (crash_it == unique_crashes.end()) {
       should_save_crash = true;
       duplicates = 1;
       unique_crashes[crash_desc] = 1;
       num_unique_crashes++;
     } else {
-      if(crash_it->second < MAX_SERVER_IDENTICAL_CRASHES) {
+      if (crash_it->second < MAX_SERVER_IDENTICAL_CRASHES) {
         should_save_crash = true;
         crash_it->second++;
         duplicates = crash_it->second;
       }
     }
 
-    if(should_save_crash) {
+    if (should_save_crash) {
       std::string crash_filename = crash_desc + "_" + std::to_string(duplicates);
       std::string outfile = DirJoin(crash_dir, crash_filename);
       sample.Save(outfile.c_str());
@@ -459,7 +460,7 @@ void CoverageServer::SaveState() {
   //corpus timestamps
   size = corpus.timestamps.size();
   fwrite(&size, sizeof(size), 1, fp);
-  if(size) fwrite(&corpus.timestamps[0], sizeof(corpus.timestamps[0]), size, fp);
+  if (size) fwrite(&corpus.timestamps[0], sizeof(corpus.timestamps[0]), size, fp);
 
   fclose(fp);
 
@@ -607,8 +608,7 @@ void CoverageServer::Init(int argc, char **argv) {
   SetupDirectories();
 
   if (GetBinaryOption("-restore", argc, argv, false) ||
-      GetBinaryOption("-resume", argc, argv, false))
-  {
+      GetBinaryOption("-resume", argc, argv, false)) {
     RestoreState();
   }
 }
@@ -638,7 +638,7 @@ void CoverageServer::RunServer() {
   listen_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (listen_socket == INVALID_SOCKET) {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-  WSACleanup();
+    WSACleanup();
 #endif
     FATAL("socket failed");
   }
@@ -648,7 +648,7 @@ void CoverageServer::RunServer() {
   serv_addr.sin_addr.s_addr = inet_addr(server_ip.c_str());
   serv_addr.sin_port = htons(server_port);
 
-  if (bind(listen_socket, (struct sockaddr*)&serv_addr, sizeof(serv_addr))) {
+  if (bind(listen_socket, (struct sockaddr *)&serv_addr, sizeof(serv_addr))) {
     closesocket(listen_socket);
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     WSACleanup();
@@ -666,8 +666,7 @@ void CoverageServer::RunServer() {
 
   CreateThread(StartStatusThread, this);
 
-  while (1)
-  {
+  while (1) {
     client_socket = accept(listen_socket, NULL, NULL);
     if (client_socket == INVALID_SOCKET) {
       closesocket(listen_socket);
@@ -679,12 +678,12 @@ void CoverageServer::RunServer() {
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     DWORD timeout = 10000;
-    if (setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (char*)&timeout, sizeof(timeout))) {
+    if (setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout))) {
 #else
     struct timeval tv;
-    tv.tv_sec = 10000; // 10 Secs Timeout 
+    tv.tv_sec = 10; // 10 Secs Timeout
     tv.tv_usec = 0;
-    if (setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (char*)&tv, sizeof(struct timeval))) {
+    if (setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(struct timeval))) {
 #endif
       closesocket(client_socket);
       closesocket(listen_socket);

@@ -16,18 +16,19 @@ limitations under the License.
 
 #define _CRT_SECURE_NO_WARNINGS
 
+#include "client.h"
 #include "common.h"
 #include "coverage.h"
-#include "client.h"
 #include "directory.h"
 
 using namespace std;
 
 void CoverageClient::Init(int argc, char **argv) {
-  keep_samples_in_memory = GetBinaryOption("-keep_samples_in_memory", argc, argv, true);
+  keep_samples_in_memory =
+      GetBinaryOption("-keep_samples_in_memory", argc, argv, true);
 
   if (!keep_samples_in_memory) {
-    char* out_dir = GetOption("-out", argc, argv);
+    char *out_dir = GetOption("-out", argc, argv);
     sample_dir = DirJoin(out_dir, "server_cache");
     CreateDirectory(sample_dir);
   }
@@ -72,9 +73,8 @@ int CoverageClient::TryConnectToServer() {
 
   printf("Connecting to server.\n");
 
-  //Create a socket
-  if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET)
-  {
+  // Create a socket
+  if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
     printf("Could not create socket\n");
     return 0;
   }
@@ -85,9 +85,8 @@ int CoverageClient::TryConnectToServer() {
   server.sin_family = AF_INET;
   server.sin_port = htons(server_port);
 
-  //Connect to remote server
-  if (connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0)
-  {
+  // Connect to remote server
+  if (connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0) {
     return 0;
   }
 
@@ -116,7 +115,8 @@ int CoverageClient::ConnectToServer(char command) {
     usleep(sleeptime * 1000);
 #endif
     sleeptime *= 2;
-    if (sleeptime > maxsleeptime) sleeptime = maxsleeptime;
+    if (sleeptime > maxsleeptime)
+      sleeptime = maxsleeptime;
   }
   return 1;
 }
@@ -146,9 +146,10 @@ int CoverageClient::ReportCrash(Sample *crash, std::string &crash_desc) {
   return 1;
 }
 
-int CoverageClient::ReportNewCoverage(Coverage *new_coverage, Sample *new_sample) {
+int CoverageClient::ReportNewCoverage(Coverage *new_coverage,
+                                      Sample *new_sample) {
   ConnectToServer('S');
-  
+
   SendCoverage(sock, *new_coverage);
 
   char reply;
@@ -174,7 +175,8 @@ int CoverageClient::ReportNewCoverage(Coverage *new_coverage, Sample *new_sample
   return 1;
 }
 
-int CoverageClient::GetUpdates(std::list<Sample *> &new_samples, uint64_t total_execs) {
+int CoverageClient::GetUpdates(std::list<Sample *> &new_samples,
+                               uint64_t total_execs) {
   uint64_t server_timestamp;
   string module_name;
 
@@ -231,15 +233,14 @@ int CoverageClient::GetUpdates(std::list<Sample *> &new_samples, uint64_t total_
   return 1;
 }
 
-void CoverageClient::SaveState(FILE* fp) {
+void CoverageClient::SaveState(FILE *fp) {
   fwrite(&last_timestamp, sizeof(last_timestamp), 1, fp);
   fwrite(&client_id, sizeof(last_timestamp), 1, fp);
   fwrite(&num_samples, sizeof(last_timestamp), 1, fp);
 }
 
-void CoverageClient::LoadState(FILE* fp) {
+void CoverageClient::LoadState(FILE *fp) {
   fread(&last_timestamp, sizeof(last_timestamp), 1, fp);
   fread(&client_id, sizeof(last_timestamp), 1, fp);
   fread(&num_samples, sizeof(last_timestamp), 1, fp);
 }
-

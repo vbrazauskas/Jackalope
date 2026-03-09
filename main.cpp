@@ -28,9 +28,9 @@ class BinaryFuzzer : public Fuzzer {
   bool TrackHotOffsets() override { return true; }
 };
 
-Mutator * BinaryFuzzer::CreateMutator(int argc, char **argv, ThreadContext *tc) {
+Mutator *BinaryFuzzer::CreateMutator(int argc, char **argv, ThreadContext *tc) {
   bool use_deterministic_mutations = true;
-  if(GetBinaryOption("-server", argc, argv, false)) {
+  if (GetBinaryOption("-server", argc, argv, false)) {
     // don't do deterministic mutation if a server is specified
     use_deterministic_mutations = false;
   }
@@ -44,7 +44,7 @@ Mutator * BinaryFuzzer::CreateMutator(int argc, char **argv, ThreadContext *tc) 
 
   int nrounds = GetIntOption("-iterations_per_round", argc, argv, 1000);
 
-  char* dictionary = GetOption("-dict", argc, argv);
+  char *dictionary = GetOption("-dict", argc, argv);
 
   // a pretty simple mutation strategy
 
@@ -59,10 +59,11 @@ Mutator * BinaryFuzzer::CreateMutator(int argc, char **argv, ThreadContext *tc) 
   pselect->AddMutator(new BlockFlipMutator(2, 16), 0.1);
   pselect->AddMutator(new BlockFlipMutator(16, 64), 0.1);
   pselect->AddMutator(new BlockFlipMutator(1, 64, true), 0.1);
-  pselect->AddMutator(new BlockDuplicateMutator(1, 128, 1, 8), 0.1);
+  pselect->AddMutator(new BlockDuplicateMutator(1, 128, 1, 8), 0.05);
+  pselect->AddMutator(new BlockDuplicateMutator(1, 16, 1, 64), 0.05);
 
   InterestingValueMutator *iv_mutator = NULL;
-  if(dictionary) {
+  if (dictionary) {
     iv_mutator = new InterestingValueMutator(false);
     iv_mutator->AddDictionary(dictionary);
   } else {
@@ -78,12 +79,12 @@ Mutator * BinaryFuzzer::CreateMutator(int argc, char **argv, ThreadContext *tc) 
     pselect->AddMutator(new SpliceMutator(2, 0.5), 0.1);
   }
 
-  Mutator* pselect_or_range = pselect;
+  Mutator *pselect_or_range = pselect;
 
   // if we are tracking ranges, insert a RangeMutator
   // between RepeatMutator and individual mutators
   if (GetBinaryOption("-track_ranges", argc, argv, false)) {
-    RangeMutator* range_mutator = new RangeMutator(pselect);
+    RangeMutator *range_mutator = new RangeMutator(pselect);
     pselect_or_range = range_mutator;
   }
 
@@ -92,20 +93,20 @@ Mutator * BinaryFuzzer::CreateMutator(int argc, char **argv, ThreadContext *tc) 
   // 0 indicates that actual mutation rate will be adapted
   RepeatMutator *repeater = new RepeatMutator(pselect_or_range, 0);
 
-  if(!use_deterministic_mutations && !deterministic_only) {
-    
+  if (!use_deterministic_mutations && !deterministic_only) {
+
     // and have nrounds of this per sample cycle
     NRoundMutator *mutator = new NRoundMutator(repeater, nrounds);
     return mutator;
-    
+
   } else {
-    
+
     MutatorSequence *deterministic_sequence = new MutatorSequence(false, true);
     // do deterministic byte flip mutations (around hot bits)
     deterministic_sequence->AddMutator(new DeterministicByteFlipMutator());
     // ..followed by deterministc interesting values
     deterministic_sequence->AddMutator(new DeterministicInterestingValueMutator(true));
-    
+
     size_t deterministic_rounds, nondeterministic_rounds;
     if (deterministic_only) {
       deterministic_rounds = nrounds;
@@ -114,14 +115,14 @@ Mutator * BinaryFuzzer::CreateMutator(int argc, char **argv, ThreadContext *tc) 
     }
     nondeterministic_rounds = nrounds - deterministic_rounds;
 
-    // do 1000 rounds of derministic mutations, will switch to nondeterministic mutations
-    // once deterministic mutator is "done"
-    DtermininsticNondeterministicMutator *mutator = 
-      new DtermininsticNondeterministicMutator(
-        deterministic_sequence, 
-        deterministic_rounds,
-        repeater,
-        nondeterministic_rounds);
+    // do 1000 rounds of derministic mutations, will switch to nondeterministic
+    // mutations once deterministic mutator is "done"
+    DtermininsticNondeterministicMutator *mutator =
+        new DtermininsticNondeterministicMutator(
+            deterministic_sequence,
+            deterministic_rounds,
+            repeater,
+            nondeterministic_rounds);
 
     return mutator;
   }
@@ -130,40 +131,48 @@ Mutator * BinaryFuzzer::CreateMutator(int argc, char **argv, ThreadContext *tc) 
 class GrammarFuzzer : public Fuzzer {
 public:
   GrammarFuzzer(const char *grammar_file);
+
 protected:
   Grammar grammar;
-  Mutator* CreateMutator(int argc, char** argv, ThreadContext* tc) override;
-  Minimizer* CreateMinimizer(int argc, char** argv, ThreadContext* tc) override;
-  bool OutputFilter(Sample* original_sample, Sample* output_sample, ThreadContext* tc) override;
+  Mutator *CreateMutator(int argc, char **argv, ThreadContext *tc) override;
+  Minimizer *CreateMinimizer(int argc, char **argv, ThreadContext *tc) override;
+  bool OutputFilter(Sample *original_sample, Sample *output_sample, ThreadContext *tc) override;
 
   bool IsReturnValueInteresting(uint64_t return_value) override;
 };
 
-GrammarFuzzer::GrammarFuzzer(const char* grammar_file) {
+GrammarFuzzer::GrammarFuzzer(const char *grammar_file) {
   if (!grammar.Read(grammar_file)) {
     FATAL("Error reading grammar");
   }
 }
 
-Mutator* GrammarFuzzer::CreateMutator(int argc, char** argv, ThreadContext* tc) {
-  GrammarMutator* grammar_mutator = new GrammarMutator(&grammar);
+Mutator *GrammarFuzzer::CreateMutator(int argc, char **argv, ThreadContext *tc) {
+  double mutation_falloff = 1.1;
+  char *fallof_option = GetOption("-grammar_mutation_falloff", argc, argv);
+  if (fallof_option) mutation_falloff = atof(fallof_option);
 
-  NRoundMutator* mutator = new NRoundMutator(grammar_mutator, 20);
+  GrammarMutator *grammar_mutator = new GrammarMutator(&grammar, mutation_falloff);
+
+  NRoundMutator *mutator = new NRoundMutator(grammar_mutator, 20);
 
   return mutator;
 }
 
-Minimizer* GrammarFuzzer::CreateMinimizer(int argc, char** argv, ThreadContext* tc) {
-  return new GrammarMinimizer(&grammar);
+Minimizer *GrammarFuzzer::CreateMinimizer(int argc, char **argv, ThreadContext *tc) {
+  int minimization_limit = GetIntOption("-grammar_minimization_limit", argc, argv, 500);
+  return new GrammarMinimizer(&grammar, minimization_limit);
 }
 
-bool GrammarFuzzer::OutputFilter(Sample* original_sample, Sample* output_sample, ThreadContext* tc) {
-  uint64_t string_size = *((uint64_t*)original_sample->bytes);
+bool GrammarFuzzer::OutputFilter(Sample *original_sample, Sample *output_sample,
+                                 ThreadContext *tc) {
+  uint64_t string_size = *((uint64_t *)original_sample->bytes);
   if (original_sample->size < (string_size + sizeof(string_size))) {
     FATAL("Incorrectly encoded grammar sample");
   }
 
-  output_sample->Init(original_sample->bytes + sizeof(string_size), string_size);
+  output_sample->Init(original_sample->bytes + sizeof(string_size),
+                      string_size);
   return true;
 }
 
@@ -171,10 +180,10 @@ bool GrammarFuzzer::IsReturnValueInteresting(uint64_t return_value) {
   return (return_value == 0);
 }
 
-void TestGrammar(char* grammar_path) {
+void TestGrammar(char *grammar_path) {
   Grammar grammar;
   grammar.Read(grammar_path);
-  PRNG* prng = new MTPRNG();
+  PRNG *prng = new MTPRNG();
   Grammar::TreeNode *tree = grammar.GenerateTree("root", prng);
   if (!tree) {
     printf("Grammar failed to generate sample\n");
@@ -185,11 +194,10 @@ void TestGrammar(char* grammar_path) {
   }
 }
 
-int main(int argc, char **argv)
-{
-  Fuzzer* fuzzer;
+int main(int argc, char **argv) {
+  Fuzzer *fuzzer;
 
-  char* grammar = GetOption("-test_grammar", argc, argv);
+  char *grammar = GetOption("-test_grammar", argc, argv);
   if (grammar) {
     TestGrammar(grammar);
     return 0;

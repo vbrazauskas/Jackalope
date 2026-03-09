@@ -16,31 +16,29 @@ limitations under the License.
 
 #define _CRT_SECURE_NO_WARNINGS
 
+#include "fuzzer.h"
+#include "client.h"
+#include "common.h"
+#include "coverage.h"
+#include "directory.h"
+#include "instrumentation.h"
+#include "litecov.h"
+#include "mersenne.h"
+#include "mutator.h"
+#include "sample.h"
+#include "sampledelivery.h"
+#include "thread.h"
 #include <stdio.h>
 #include <string.h>
-#include "common.h"
-#include "sample.h"
-#include "fuzzer.h"
-#include "sampledelivery.h"
-#include "instrumentation.h"
-#include "coverage.h"
-#include "mutator.h"
-#include "thread.h"
-#include "directory.h"
-#include "client.h"
-#include "mersenne.h"
-#include "litecov.h"
 
 using namespace std;
 
-void Fuzzer::PrintUsage()
-{
+void Fuzzer::PrintUsage() {
   printf("Incorrect usage, please refer to the documentation\n");
   exit(0);
 }
 
-void Fuzzer::ParseOptions(int argc, char **argv)
-{
+void Fuzzer::ParseOptions(int argc, char **argv) {
   server_update_interval_ms = 5 * 60 * 1000;
   acceptable_hang_ratio = 0.01;
   acceptable_crash_ratio = 0.02;
@@ -62,35 +60,27 @@ void Fuzzer::ParseOptions(int argc, char **argv)
   this->out_dir = option;
 
   option = GetOption("-delivery_dir", argc, argv);
-  if (!option)
-  {
+  if (!option) {
     delivery_dir = out_dir;
-  }
-  else
-  {
+  } else {
     delivery_dir = option;
   }
 
   num_threads = GetIntOption("-nthreads", argc, argv, 1);
 
   int target_opt_ind = 0;
-  for (int i = 1; i < argc; i++)
-  {
-    if (strcmp(argv[i], "--") == 0)
-    {
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--") == 0) {
       target_opt_ind = i + 1;
       break;
     }
   }
 
   char *cmd = NULL;
-  if (target_opt_ind)
-  {
+  if (target_opt_ind) {
     target_argc = argc - target_opt_ind;
     target_argv = argv + target_opt_ind;
-  }
-  else
-  {
+  } else {
     target_argc = 0;
     target_argv = NULL;
   }
@@ -101,47 +91,47 @@ void Fuzzer::ParseOptions(int argc, char **argv)
 
   corpus_timeout = GetIntOption("-t_corpus", argc, argv, timeout);
 
-  if (GetOption("-server", argc, argv))
-  {
+  if (GetOption("-server", argc, argv)) {
     server = new CoverageClient();
     server->Init(argc, argv);
-  }
-  else
-  {
+  } else {
     server = NULL;
   }
 
   should_restore_state = false;
-  if ((in_dir == "-") ||
-      GetBinaryOption("-restore", argc, argv, false) ||
-      GetBinaryOption("-resume", argc, argv, false))
-  {
+  if ((in_dir == "-") || GetBinaryOption("-restore", argc, argv, false) ||
+      GetBinaryOption("-resume", argc, argv, false)) {
     should_restore_state = true;
   }
 
-  clean_target_on_coverage = GetBinaryOption("-clean_target_on_coverage", argc, argv, true);
-  coverage_reproduce_retries = GetIntOption("-coverage_retry", argc, argv, DEFAULT_COVERAGE_REPRODUCE_RETRIES);
-  crash_reproduce_retries = GetIntOption("-crash_retry", argc, argv, DEFAULT_CRASH_REPRODUCE_RETRIES);
+  clean_target_on_coverage =
+      GetBinaryOption("-clean_target_on_coverage", argc, argv, true);
+  coverage_reproduce_retries = GetIntOption("-coverage_retry", argc, argv,
+                                            DEFAULT_COVERAGE_REPRODUCE_RETRIES);
+  crash_reproduce_retries =
+      GetIntOption("-crash_retry", argc, argv, DEFAULT_CRASH_REPRODUCE_RETRIES);
 
   minimize_samples = GetBinaryOption("-minimize_samples", argc, argv, true);
 
-  keep_samples_in_memory = GetBinaryOption("-keep_samples_in_memory", argc, argv, true);
+  keep_samples_in_memory =
+      GetBinaryOption("-keep_samples_in_memory", argc, argv, true);
 
   track_ranges = GetBinaryOption("-track_ranges", argc, argv, false);
 
-  Sample::max_size = (size_t)GetIntOption("-max_sample_size", argc, argv, DEFAULT_MAX_SAMPLE_SIZE);
+  Sample::max_size = (size_t)GetIntOption("-max_sample_size", argc, argv,
+                                          DEFAULT_MAX_SAMPLE_SIZE);
 
   dry_run = GetBinaryOption("-dry_run", argc, argv, false);
 
-  incremental_coverage = GetBinaryOption("-incremental_coverage", argc, argv, true);
+  incremental_coverage =
+      GetBinaryOption("-incremental_coverage", argc, argv, true);
 
   add_all_inputs = GetBinaryOption("-add_all_inputs", argc, argv, false);
 
   dump_coverage = GetBinaryOption("-dump_coverage", argc, argv, false);
 }
 
-void Fuzzer::SetupDirectories()
-{
+void Fuzzer::SetupDirectories() {
   // create output directories
   CreateDirectory(out_dir);
   crash_dir = DirJoin(out_dir, "crashes");
@@ -152,15 +142,13 @@ void Fuzzer::SetupDirectories()
   CreateDirectory(sample_dir);
 }
 
-void *StartFuzzThread(void *arg)
-{
+void *StartFuzzThread(void *arg) {
   Fuzzer::ThreadContext *tc = (Fuzzer::ThreadContext *)arg;
   tc->fuzzer->RunFuzzerThread(tc);
   return NULL;
 }
 
-Fuzzer::ThreadContext::~ThreadContext()
-{
+Fuzzer::ThreadContext::~ThreadContext() {
   if (sampleDelivery)
     delete sampleDelivery;
   if (prng)
@@ -173,10 +161,8 @@ Fuzzer::ThreadContext::~ThreadContext()
     free(target_argv);
 }
 
-void Fuzzer::Run(int argc, char **argv)
-{
-  if (GetOption("-start_server", argc, argv))
-  {
+void Fuzzer::Run(int argc, char **argv) {
+  if (GetOption("-start_server", argc, argv)) {
     // run the server
     printf("Running as server\n");
     CoverageServer server;
@@ -200,20 +186,14 @@ void Fuzzer::Run(int argc, char **argv)
 
   SetupDirectories();
 
-  if (should_restore_state)
-  {
+  if (should_restore_state) {
     state = RESTORE_NEEDED;
-  }
-  else
-  {
+  } else {
     GetFilesInDirectory(in_dir, input_files);
 
-    if (input_files.size() == 0)
-    {
+    if (input_files.size() == 0) {
       WARN("Input directory is empty\n");
-    }
-    else
-    {
+    } else {
       SAY("%d input files read\n", (int)input_files.size());
     }
     state = INPUT_SAMPLE_PROCESSING;
@@ -221,8 +201,7 @@ void Fuzzer::Run(int argc, char **argv)
 
   last_save_time = GetCurTime();
 
-  for (int i = 1; i <= num_threads; i++)
-  {
+  for (int i = 1; i <= num_threads; i++) {
     ThreadContext *tc = CreateThreadContext(argc, argv, i);
     CreateThread(StartFuzzThread, tc);
   }
@@ -231,8 +210,7 @@ void Fuzzer::Run(int argc, char **argv)
 
   uint32_t secs_to_sleep = 1;
 
-  while (1)
-  {
+  while (1) {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
     Sleep(secs_to_sleep * 1000);
 #else
@@ -241,50 +219,51 @@ void Fuzzer::Run(int argc, char **argv)
 
     size_t num_offsets = 0;
     coverage_mutex.Lock();
-    for (auto iter = fuzzer_coverage.begin(); iter != fuzzer_coverage.end(); iter++)
-    {
+    for (auto iter = fuzzer_coverage.begin(); iter != fuzzer_coverage.end();
+         iter++) {
       num_offsets += iter->offsets.size();
     }
     coverage_mutex.Unlock();
 
-    printf("\nTotal execs: %lld\nUnique samples: %lld (%lld discarded)\nCrashes: %lld (%lld unique)\nHangs: %lld\nOffsets: %zu\nExecs/s: %lld\n", total_execs, num_samples, num_samples_discarded, num_crashes, num_unique_crashes, num_hangs, num_offsets, (total_execs - last_execs) / secs_to_sleep);
+    printf(
+        "\nTotal execs: %lld\nUnique samples: %lld (%lld discarded)\nCrashes: "
+        "%lld (%lld unique)\nHangs: %lld\nOffsets: %zu\nExecs/s: %lld\n",
+        total_execs, num_samples, num_samples_discarded, num_crashes,
+        num_unique_crashes, num_hangs, num_offsets,
+        (total_execs - last_execs) / secs_to_sleep);
     last_execs = total_execs;
 
-    if (state == FUZZING && dry_run)
-    {
+    if (state == FUZZING && dry_run) {
       printf("\nDry run done\n");
       exit(0);
     }
   }
 }
 
-RunResult Fuzzer::RunSampleAndGetCoverage(ThreadContext *tc, Sample *sample, Coverage *coverage, uint32_t init_timeout, uint32_t timeout)
-{
+RunResult Fuzzer::RunSampleAndGetCoverage(ThreadContext *tc, Sample *sample,
+                                          Coverage *coverage,
+                                          uint32_t init_timeout,
+                                          uint32_t timeout) {
   // from this point on, the sample could be filtered
   Sample filteredSample;
-  if (OutputFilter(sample, &filteredSample, tc))
-  {
+  if (OutputFilter(sample, &filteredSample, tc)) {
     sample = &filteredSample;
   }
 
   // not protected by a mutex but not important to be perfectly accurate
   total_execs++;
 
-  if (!tc->sampleDelivery->DeliverSample(sample))
-  {
+  if (!tc->sampleDelivery->DeliverSample(sample)) {
     WARN("Error delivering sample, retrying with a clean target");
     tc->instrumentation->CleanTarget();
     bool delivery_successful = false;
-    for (int retry = 0; retry < DELIVERY_RETRY_TIMES; retry++)
-    {
-      if (tc->sampleDelivery->DeliverSample(sample))
-      {
-        WARN("Sample delivery completed successfully after %d retries\n", (retry + 1));
+    for (int retry = 0; retry < DELIVERY_RETRY_TIMES; retry++) {
+      if (tc->sampleDelivery->DeliverSample(sample)) {
+        WARN("Sample delivery completed successfully after %d retries\n",
+             (retry + 1));
         delivery_successful = true;
         break;
-      }
-      else
-      {
+      } else {
         WARN("Repeatedly failed to deliver sample, retrying after delay");
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
         Sleep(1000);
@@ -293,29 +272,24 @@ RunResult Fuzzer::RunSampleAndGetCoverage(ThreadContext *tc, Sample *sample, Cov
 #endif
       }
     }
-    if (!delivery_successful)
-    {
+    if (!delivery_successful) {
       FATAL("Repeatedly failed to deliver sample");
     }
   }
 
-  RunResult result = tc->instrumentation->Run(tc->target_argc, tc->target_argv, init_timeout, timeout);
+  RunResult result = tc->instrumentation->Run(tc->target_argc, tc->target_argv,
+                                              init_timeout, timeout);
   tc->instrumentation->GetCoverage(*coverage, true);
 
   // save crashes and hangs immediately when they are detected
-  if (result == CRASH)
-  {
+  if (result == CRASH) {
     string crash_desc = tc->instrumentation->GetCrashName();
 
-    if (crash_reproduce_retries > 0)
-    {
-      if (TryReproduceCrash(tc, sample, init_timeout, timeout) == CRASH)
-      {
+    if (crash_reproduce_retries > 0) {
+      if (TryReproduceCrash(tc, sample, init_timeout, timeout) == CRASH) {
         // get a hopefully better name
         crash_desc = tc->instrumentation->GetCrashName();
-      }
-      else
-      {
+      } else {
         crash_desc = "flaky_" + crash_desc;
       }
     }
@@ -327,17 +301,13 @@ RunResult Fuzzer::RunSampleAndGetCoverage(ThreadContext *tc, Sample *sample, Cov
     num_crashes++;
 
     auto crash_it = unique_crashes.find(crash_desc);
-    if (crash_it == unique_crashes.end())
-    {
+    if (crash_it == unique_crashes.end()) {
       should_save_crash = true;
       duplicates = 1;
       unique_crashes[crash_desc] = 1;
       num_unique_crashes++;
-    }
-    else
-    {
-      if (crash_it->second < MAX_IDENTICAL_CRASHES)
-      {
+    } else {
+      if (crash_it->second < MAX_IDENTICAL_CRASHES) {
         should_save_crash = true;
         crash_it->second++;
         duplicates = crash_it->second;
@@ -345,8 +315,7 @@ RunResult Fuzzer::RunSampleAndGetCoverage(ThreadContext *tc, Sample *sample, Cov
     }
     crash_mutex.Unlock();
 
-    if (should_save_crash)
-    {
+    if (should_save_crash) {
       string crash_filename = crash_desc + "_" + std::to_string(duplicates);
 
       output_mutex.Lock();
@@ -354,8 +323,7 @@ RunResult Fuzzer::RunSampleAndGetCoverage(ThreadContext *tc, Sample *sample, Cov
       sample->Save(outfile.c_str());
       output_mutex.Unlock();
 
-      if (server)
-      {
+      if (server) {
         server_mutex.Lock();
         server->ReportCrash(sample, crash_desc);
         server_mutex.Unlock();
@@ -363,12 +331,11 @@ RunResult Fuzzer::RunSampleAndGetCoverage(ThreadContext *tc, Sample *sample, Cov
     }
   }
 
-  if (result == HANG)
-  {
+  if (result == HANG) {
     output_mutex.Lock();
-    if (save_hangs)
-    {
-      string outfile = DirJoin(hangs_dir, string("hang_") + std::to_string(num_hangs));
+    if (save_hangs) {
+      string outfile =
+          DirJoin(hangs_dir, string("hang_") + std::to_string(num_hangs));
       sample->Save(outfile.c_str());
     }
     num_hangs++;
@@ -378,25 +345,24 @@ RunResult Fuzzer::RunSampleAndGetCoverage(ThreadContext *tc, Sample *sample, Cov
   return result;
 }
 
-RunResult Fuzzer::TryReproduceCrash(ThreadContext *tc, Sample *sample, uint32_t init_timeout, uint32_t timeout)
-{
+RunResult Fuzzer::TryReproduceCrash(ThreadContext *tc, Sample *sample,
+                                    uint32_t init_timeout, uint32_t timeout) {
   RunResult result;
 
-  for (int i = 0; i < crash_reproduce_retries; i++)
-  {
+  for (int i = 0; i < crash_reproduce_retries; i++) {
     total_execs++;
 
-    if (!tc->sampleDelivery->DeliverSample(sample))
-    {
+    if (!tc->sampleDelivery->DeliverSample(sample)) {
       WARN("Error delivering sample, retrying with a clean target");
       tc->instrumentation->CleanTarget();
-      if (!tc->sampleDelivery->DeliverSample(sample))
-      {
-        FATAL("Repeatedly failed to deliver sample");
+      if (!tc->sampleDelivery->DeliverSample(sample)) {
+        WARN("Repeatedly failed to deliver sample when reproducing a crash, the crashs will be saved as flaky");
+        return HANG;
       }
     }
 
-    result = tc->instrumentation->RunWithCrashAnalysis(tc->target_argc, tc->target_argv, init_timeout, timeout);
+    result = tc->instrumentation->RunWithCrashAnalysis(
+        tc->target_argc, tc->target_argv, init_timeout, timeout);
     tc->instrumentation->ClearCoverage();
 
     if (result == CRASH)
@@ -406,19 +372,19 @@ RunResult Fuzzer::TryReproduceCrash(ThreadContext *tc, Sample *sample, uint32_t 
   return result;
 }
 
-void Fuzzer::SaveSample(ThreadContext *tc, Sample *sample, uint32_t init_timeout, uint32_t timeout, Sample *original_sample)
-{
+void Fuzzer::SaveSample(ThreadContext *tc, Sample *sample,
+                        uint32_t init_timeout, uint32_t timeout,
+                        Sample *original_sample) {
   std::vector<Range> ranges;
-  if (track_ranges)
-  {
+  if (track_ranges) {
     // need to rerun the sample as the minimizer could have changed ranges
     Coverage tmp_coverage;
-    RunResult result = RunSampleAndGetCoverage(tc, sample, &tmp_coverage, init_timeout, timeout);
+    RunResult result = RunSampleAndGetCoverage(tc, sample, &tmp_coverage,
+                                               init_timeout, timeout);
     // this could fail, but the chance is it will be OK
     // If it fails and no ranges are extracted,
     // we'll just mutate the entire sample
-    if (result == OK)
-    {
+    if (result == OK) {
       tc->range_tracker->ExtractRanges(&ranges);
     }
   }
@@ -436,15 +402,11 @@ void Fuzzer::SaveSample(ThreadContext *tc, Sample *sample, uint32_t init_timeout
   Sample *new_sample = new Sample(*sample);
   new_entry->sample = new_sample;
   new_entry->context = tc->mutator->CreateSampleContext(new_entry->sample);
-  if (TrackHotOffsets())
-  {
-    if (keep_samples_in_memory)
-    {
+  if (TrackHotOffsets()) {
+    if (keep_samples_in_memory) {
       size_t mutation_offset = sample_trie.AddSample(new_sample);
       tc->mutator->AddHotOffset(new_entry->context, mutation_offset);
-    }
-    else if (original_sample)
-    {
+    } else if (original_sample) {
       size_t mutation_offset = original_sample->FindFirstDiff(*new_sample);
       tc->mutator->AddHotOffset(new_entry->context, mutation_offset);
     }
@@ -454,8 +416,7 @@ void Fuzzer::SaveSample(ThreadContext *tc, Sample *sample, uint32_t init_timeout
   new_entry->sample_filename = filename;
   new_entry->ranges = ranges;
 
-  if (!keep_samples_in_memory)
-  {
+  if (!keep_samples_in_memory) {
     new_sample->filename = outfile;
     new_sample->FreeMemory();
   }
@@ -467,16 +428,18 @@ void Fuzzer::SaveSample(ThreadContext *tc, Sample *sample, uint32_t init_timeout
   queue_mutex.Unlock();
 }
 
-RunResult Fuzzer::RunSample(ThreadContext *tc, Sample *sample, int *has_new_coverage, bool trim, bool report_to_server, uint32_t init_timeout, uint32_t timeout, Sample *original_sample)
-{
-  if (has_new_coverage)
-  {
+RunResult Fuzzer::RunSample(ThreadContext *tc, Sample *sample,
+                            int *has_new_coverage, bool trim,
+                            bool report_to_server, uint32_t init_timeout,
+                            uint32_t timeout, Sample *original_sample) {
+  if (has_new_coverage) {
     *has_new_coverage = 0;
   }
 
   Coverage initialCoverage;
 
-  RunResult result = RunSampleAndGetCoverage(tc, sample, &initialCoverage, init_timeout, timeout);
+  RunResult result = RunSampleAndGetCoverage(tc, sample, &initialCoverage,
+                                             init_timeout, timeout);
 
   if (result != OK)
     return result;
@@ -487,10 +450,10 @@ RunResult Fuzzer::RunSample(ThreadContext *tc, Sample *sample, int *has_new_cove
   if (initialCoverage.empty())
     return result;
 
-  if (!incremental_coverage)
-  {
+  if (!incremental_coverage) {
     Coverage new_thread_coverage;
-    CoverageDifference(tc->thread_coverage, initialCoverage, new_thread_coverage);
+    CoverageDifference(tc->thread_coverage, initialCoverage,
+                       new_thread_coverage);
     if (new_thread_coverage.empty())
       return result;
   }
@@ -507,11 +470,11 @@ RunResult Fuzzer::RunSample(ThreadContext *tc, Sample *sample, int *has_new_cove
   if (clean_target_on_coverage)
     tc->instrumentation->CleanTarget();
 
-  for (int i = 0; i < coverage_reproduce_retries; i++)
-  {
+  for (int i = 0; i < coverage_reproduce_retries; i++) {
     Coverage retryCoverage, tmpCoverage;
 
-    result = RunSampleAndGetCoverage(tc, sample, &retryCoverage, init_timeout, timeout);
+    result = RunSampleAndGetCoverage(tc, sample, &retryCoverage, init_timeout,
+                                     timeout);
     if (result != OK)
       return result;
 
@@ -532,18 +495,15 @@ RunResult Fuzzer::RunSample(ThreadContext *tc, Sample *sample, int *has_new_cove
   // printf("Variable coverage:\n");
   // PrintCoverage(variableCoverage);
 
-  if (InterestingSample(tc, sample, &stableCoverage, &variableCoverage))
-  {
-    if (has_new_coverage)
-    {
+  if (InterestingSample(tc, sample, &stableCoverage, &variableCoverage)) {
+    if (has_new_coverage) {
       *has_new_coverage = 1;
     }
 
     if (trim && minimize_samples)
       MinimizeSample(tc, sample, &stableCoverage, init_timeout, timeout);
 
-    if (server && report_to_server)
-    {
+    if (server && report_to_server) {
       server_mutex.Lock();
       server->ReportNewCoverage(&stableCoverage, sample);
       server_mutex.Unlock();
@@ -552,8 +512,7 @@ RunResult Fuzzer::RunSample(ThreadContext *tc, Sample *sample, int *has_new_cove
     SaveSample(tc, sample, init_timeout, timeout, original_sample);
   }
 
-  if (!variableCoverage.empty() && server && report_to_server)
-  {
+  if (!variableCoverage.empty() && server && report_to_server) {
     server_mutex.Lock();
     server->ReportNewCoverage(&variableCoverage, NULL);
     server_mutex.Unlock();
@@ -562,20 +521,18 @@ RunResult Fuzzer::RunSample(ThreadContext *tc, Sample *sample, int *has_new_cove
   // printf("Total coverage:\n");
   // PrintCoverage(totalCoverage);
 
-  if (incremental_coverage)
-  {
+  if (incremental_coverage) {
     tc->instrumentation->IgnoreCoverage(totalCoverage);
-  }
-  else
-  {
+  } else {
     MergeCoverage(tc->thread_coverage, totalCoverage);
   }
 
   return result;
 }
 
-void Fuzzer::MinimizeSample(ThreadContext *tc, Sample *sample, Coverage *stable_coverage, uint32_t init_timeout, uint32_t timeout)
-{
+void Fuzzer::MinimizeSample(ThreadContext *tc, Sample *sample,
+                            Coverage *stable_coverage, uint32_t init_timeout,
+                            uint32_t timeout) {
   Minimizer *minimizer = tc->minimizer;
 
   if (!minimizer)
@@ -585,24 +542,22 @@ void Fuzzer::MinimizeSample(ThreadContext *tc, Sample *sample, Coverage *stable_
 
   Sample test_sample = *sample;
 
-  while (1)
-  {
+  while (1) {
     if (!minimizer->MinimizeStep(&test_sample, context))
       break;
 
     Coverage test_coverage;
-    RunResult result = RunSampleAndGetCoverage(tc, &test_sample, &test_coverage, init_timeout, timeout);
+    RunResult result = RunSampleAndGetCoverage(tc, &test_sample, &test_coverage,
+                                               init_timeout, timeout);
 
     if (result != OK)
       break;
 
-    if (!IsReturnValueInteresting(tc->instrumentation->GetReturnValue()) || !CoverageContains(test_coverage, *stable_coverage))
-    {
+    if (!IsReturnValueInteresting(tc->instrumentation->GetReturnValue()) ||
+        !CoverageContains(test_coverage, *stable_coverage)) {
       minimizer->ReportFail(&test_sample, context);
       test_sample = *sample;
-    }
-    else
-    {
+    } else {
       minimizer->ReportSuccess(&test_sample, context);
       *sample = test_sample;
     }
@@ -611,8 +566,9 @@ void Fuzzer::MinimizeSample(ThreadContext *tc, Sample *sample, Coverage *stable_
   delete context;
 }
 
-int Fuzzer::InterestingSample(ThreadContext *tc, Sample *sample, Coverage *stableCoverage, Coverage *variableCoverage)
-{
+int Fuzzer::InterestingSample(ThreadContext *tc, Sample *sample,
+                              Coverage *stableCoverage,
+                              Coverage *variableCoverage) {
   coverage_mutex.Lock();
 
   Coverage new_stable_coverage;
@@ -640,25 +596,21 @@ int Fuzzer::InterestingSample(ThreadContext *tc, Sample *sample, Coverage *stabl
   return 0;
 }
 
-void Fuzzer::SynchronizeAndGetJob(ThreadContext *tc, FuzzerJob *job)
-{
+void Fuzzer::SynchronizeAndGetJob(ThreadContext *tc, FuzzerJob *job) {
   queue_mutex.Lock();
 
   // handle saving and loading first (if needed).
   // first thread that enters this function restores state
-  if (state == RESTORE_NEEDED)
-  {
+  if (state == RESTORE_NEEDED) {
     RestoreState(tc);
     state = INPUT_SAMPLE_PROCESSING;
   }
 
   // only save state while fuzzing
-  if (state == FUZZING)
-  {
+  if (state == FUZZING) {
     uint64_t cur_time = GetCurTime();
     if ((cur_time > last_save_time) &&
-        (((cur_time - last_save_time) / 1000) > FUZZER_SAVE_INERVAL))
-    {
+        (((cur_time - last_save_time) / 1000) > FUZZER_SAVE_INERVAL)) {
       SaveState(tc);
       last_save_time = cur_time;
     }
@@ -666,10 +618,8 @@ void Fuzzer::SynchronizeAndGetJob(ThreadContext *tc, FuzzerJob *job)
 
   // after restoring the state
   // ignore the previously seen (restored) coverage
-  if (!tc->coverage_initialized)
-  {
-    if (incremental_coverage)
-    {
+  if (!tc->coverage_initialized) {
+    if (incremental_coverage) {
       coverage_mutex.Lock();
       tc->instrumentation->IgnoreCoverage(fuzzer_coverage);
       coverage_mutex.Unlock();
@@ -678,12 +628,10 @@ void Fuzzer::SynchronizeAndGetJob(ThreadContext *tc, FuzzerJob *job)
   }
 
   // sync all_samples_local with all_samples
-  if (all_samples.size() > tc->all_samples_local.size())
-  {
+  if (all_samples.size() > tc->all_samples_local.size()) {
     size_t old_size = tc->all_samples_local.size();
     tc->all_samples_local.resize(all_samples.size());
-    for (size_t i = old_size; i < all_samples.size(); i++)
-    {
+    for (size_t i = old_size; i < all_samples.size(); i++) {
       tc->all_samples_local[i] = all_samples[i];
     }
   }
@@ -691,8 +639,8 @@ void Fuzzer::SynchronizeAndGetJob(ThreadContext *tc, FuzzerJob *job)
   // change state if needed
 
   if ((state == FUZZING) && server &&
-      (GetCurTime() > (last_server_update_time_ms + server_update_interval_ms)))
-  {
+      (GetCurTime() >
+       (last_server_update_time_ms + server_update_interval_ms))) {
     last_server_update_time_ms = GetCurTime();
     server_mutex.Lock();
     server->GetUpdates(server_samples, total_execs);
@@ -700,12 +648,9 @@ void Fuzzer::SynchronizeAndGetJob(ThreadContext *tc, FuzzerJob *job)
     state = SERVER_SAMPLE_PROCESSING;
   }
 
-  if (state == INPUT_SAMPLE_PROCESSING)
-  {
-    if (input_files.empty() && !samples_pending)
-    {
-      if (server)
-      {
+  if (state == INPUT_SAMPLE_PROCESSING) {
+    if (input_files.empty() && !samples_pending) {
+      if (server) {
         server_mutex.Lock();
         coverage_mutex.Lock();
         server->ReportNewCoverage(&fuzzer_coverage, NULL);
@@ -714,131 +659,95 @@ void Fuzzer::SynchronizeAndGetJob(ThreadContext *tc, FuzzerJob *job)
         server->GetUpdates(server_samples, total_execs);
         server_mutex.Unlock();
         state = SERVER_SAMPLE_PROCESSING;
-      }
-      else
-      {
+      } else {
         state = FUZZING;
       }
     }
   }
 
-  if (state == SERVER_SAMPLE_PROCESSING)
-  {
-    if (server_samples.empty() && !samples_pending)
-    {
+  if (state == SERVER_SAMPLE_PROCESSING) {
+    if (server_samples.empty() && !samples_pending) {
       state = FUZZING;
     }
   }
 
-  if ((state == FUZZING) && (num_samples == 0))
-  {
-    if (tc->mutator->CanGenerateSample())
-    {
-      printf("Sample queue is empty, but the mutatator supports sample generation\n");
+  if ((state == FUZZING) && (num_samples == 0)) {
+    if (tc->mutator->CanGenerateSample()) {
+      printf("Sample queue is empty, but the mutatator supports sample "
+             "generation\n");
       printf("Will try to generate initial samples\n");
       state = GENERATING_SAMPLES;
-    }
-    else
-    {
+    } else {
       FATAL("No interesting input files\n");
     }
   }
 
-  if (state == GENERATING_SAMPLES && (sample_queue.size() >= MIN_SAMPLES_TO_GENERATE) && (!samples_pending))
-  {
+  if (state == GENERATING_SAMPLES &&
+      (sample_queue.size() >= MIN_SAMPLES_TO_GENERATE) && (!samples_pending)) {
     state = FUZZING;
   }
 
   // create a job according to the state
-  if (state == FUZZING && !dry_run)
-  {
-    if (sample_queue.empty())
-    {
+  if (state == FUZZING && !dry_run) {
+    if (sample_queue.empty()) {
       job->type = WAIT;
-    }
-    else
-    {
+    } else {
       job->type = FUZZ;
       job->entry = sample_queue.top();
       sample_queue.pop();
     }
-  }
-  else if (state == INPUT_SAMPLE_PROCESSING)
-  {
-    if (input_files.empty())
-    {
+  } else if (state == INPUT_SAMPLE_PROCESSING) {
+    if (input_files.empty()) {
       job->type = WAIT;
-    }
-    else
-    {
+    } else {
       job->type = PROCESS_SAMPLE;
       std::string filename = input_files.front();
       input_files.pop_front();
       printf("Running input sample %s\n", filename.c_str());
       job->sample = new Sample();
       job->sample->Load(filename.c_str());
-      if (job->sample->size > Sample::max_size)
-      {
+      if (job->sample->size > Sample::max_size) {
         WARN("Input sample larger than maximum sample size. Will be trimmed");
         job->sample->Trim(Sample::max_size);
       }
       samples_pending++;
     }
-  }
-  else if (state == SERVER_SAMPLE_PROCESSING)
-  {
-    if (server_samples.empty())
-    {
+  } else if (state == SERVER_SAMPLE_PROCESSING) {
+    if (server_samples.empty()) {
       job->type = WAIT;
-    }
-    else
-    {
+    } else {
       job->type = PROCESS_SAMPLE;
       job->sample = server_samples.front();
       server_samples.pop_front();
       samples_pending++;
     }
-  }
-  else if (state == GENERATING_SAMPLES)
-  {
-    if (sample_queue.size() >= MIN_SAMPLES_TO_GENERATE)
-    {
+  } else if (state == GENERATING_SAMPLES) {
+    if (sample_queue.size() >= MIN_SAMPLES_TO_GENERATE) {
       job->type = WAIT;
-    }
-    else
-    {
+    } else {
       job->type = PROCESS_SAMPLE;
       job->sample = new Sample();
       tc->mutator->GenerateSample(job->sample, tc->prng);
       samples_pending++;
     }
-  }
-  else
-  {
+  } else {
     job->type = WAIT;
   }
 
   queue_mutex.Unlock();
 }
 
-void Fuzzer::JobDone(FuzzerJob *job)
-{
+void Fuzzer::JobDone(FuzzerJob *job) {
   queue_mutex.Lock();
 
-  if (job->type == FUZZ)
-  {
-    if (job->discard_sample)
-    {
+  if (job->type == FUZZ) {
+    if (job->discard_sample) {
       job->entry->discarded = 1;
       num_samples_discarded++;
-    }
-    else
-    {
+    } else {
       sample_queue.push(job->entry);
     }
-  }
-  else if (job->type == PROCESS_SAMPLE)
-  {
+  } else if (job->type == PROCESS_SAMPLE) {
     delete job->sample;
     samples_pending--;
   }
@@ -846,8 +755,7 @@ void Fuzzer::JobDone(FuzzerJob *job)
   queue_mutex.Unlock();
 }
 
-void Fuzzer::FuzzJob(ThreadContext *tc, FuzzerJob *job)
-{
+void Fuzzer::FuzzJob(ThreadContext *tc, FuzzerJob *job) {
   SampleQueueEntry *entry = job->entry;
 
   tc->mutator->InitRound(entry->sample, entry->context);
@@ -861,27 +769,24 @@ void Fuzzer::FuzzJob(ThreadContext *tc, FuzzerJob *job)
 
   entry->sample->EnsureLoaded();
 
-  while (1)
-  {
+  while (1) {
     Sample mutated_sample = *entry->sample;
     if (!tc->mutator->Mutate(&mutated_sample, tc->prng, tc->all_samples_local))
       break;
-    if (mutated_sample.size > Sample::max_size)
-    {
+    if (mutated_sample.size > Sample::max_size) {
       continue;
     }
 
     int has_new_coverage;
-    RunResult result = RunSample(tc, &mutated_sample, &has_new_coverage, true, true, init_timeout, timeout, entry->sample);
+    RunResult result = RunSample(tc, &mutated_sample, &has_new_coverage, true,
+                                 true, init_timeout, timeout, entry->sample);
     AdjustSamplePriority(tc, entry, has_new_coverage);
     tc->mutator->NotifyResult(result, has_new_coverage);
 
     entry->num_runs++;
-    if (has_new_coverage)
-    {
+    if (has_new_coverage) {
       entry->num_newcoverage++;
-      if (TrackHotOffsets())
-      {
+      if (TrackHotOffsets()) {
         size_t diff_offset = entry->sample->FindFirstDiff(mutated_sample);
         tc->mutator->AddHotOffset(entry->context, diff_offset);
       }
@@ -892,63 +797,51 @@ void Fuzzer::FuzzJob(ThreadContext *tc, FuzzerJob *job)
     if (result == CRASH)
       entry->num_crashes++;
     if ((entry->num_hangs > 10) &&
-        (entry->num_hangs > (entry->num_runs * acceptable_hang_ratio)))
-    {
-      WARN("Sample %lld produces too many hangs. Discarding\n", entry->sample_index);
+        (entry->num_hangs > (entry->num_runs * acceptable_hang_ratio))) {
+      WARN("Sample %lld produces too many hangs. Discarding\n",
+           entry->sample_index);
       job->discard_sample = true;
       break;
     }
     if ((entry->num_crashes > 100) &&
-        (entry->num_crashes > (entry->num_runs * acceptable_crash_ratio)))
-    {
-      WARN("Sample %lld produces too many crashes. Discarding\n", entry->sample_index);
+        (entry->num_crashes > (entry->num_runs * acceptable_crash_ratio))) {
+      WARN("Sample %lld produces too many crashes. Discarding\n",
+           entry->sample_index);
       job->discard_sample = true;
       break;
     }
   }
 
-  if (!keep_samples_in_memory)
-  {
+  if (!keep_samples_in_memory) {
     entry->sample->FreeMemory();
   }
 }
 
-void Fuzzer::ProcessSample(ThreadContext *tc, FuzzerJob *job)
-{
+void Fuzzer::ProcessSample(ThreadContext *tc, FuzzerJob *job) {
   int has_new_coverage = 0;
   job->sample->EnsureLoaded();
-  RunResult result = RunSample(tc, job->sample, &has_new_coverage, false, false, init_timeout, corpus_timeout, NULL);
-  if (result == CRASH)
-  {
+  RunResult result = RunSample(tc, job->sample, &has_new_coverage, false, false,
+                               init_timeout, corpus_timeout, NULL);
+  if (result == CRASH) {
     WARN("Input sample resulted in a crash");
-  }
-  else if (result == HANG)
-  {
+  } else if (result == HANG) {
     WARN("Input sample resulted in a hang");
-  }
-  else if (!has_new_coverage)
-  {
-    if (add_all_inputs)
-    {
+  } else if (!has_new_coverage) {
+    if (add_all_inputs) {
       SaveSample(tc, job->sample, init_timeout, corpus_timeout, NULL);
-    }
-    else if (state != GENERATING_SAMPLES)
-    {
+    } else if (state != GENERATING_SAMPLES) {
       WARN("Input sample has no new stable coverage");
     }
   }
 }
 
-void Fuzzer::RunFuzzerThread(ThreadContext *tc)
-{
-  while (1)
-  {
+void Fuzzer::RunFuzzerThread(ThreadContext *tc) {
+  while (1) {
     FuzzerJob job;
 
     SynchronizeAndGetJob(tc, &job);
 
-    switch (job.type)
-    {
+    switch (job.type) {
     case WAIT:
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
       Sleep(1000);
@@ -971,14 +864,12 @@ void Fuzzer::RunFuzzerThread(ThreadContext *tc)
   }
 }
 
-void Fuzzer::DumpCoverage()
-{
+void Fuzzer::DumpCoverage() {
   std::string out_file = DirJoin(out_dir, "coverage.txt");
   WriteCoverage(fuzzer_coverage, out_file.c_str());
 }
 
-void Fuzzer::SaveState(ThreadContext *tc)
-{
+void Fuzzer::SaveState(ThreadContext *tc) {
   // don't save during input sample processing
   if (state == INPUT_SAMPLE_PROCESSING)
     return;
@@ -988,8 +879,7 @@ void Fuzzer::SaveState(ThreadContext *tc)
 
   std::string out_file = DirJoin(out_dir, std::string("state.dat"));
   FILE *fp = fopen(out_file.c_str(), "wb");
-  if (!fp)
-  {
+  if (!fp) {
     FATAL("Error saving state");
   }
 
@@ -1003,8 +893,7 @@ void Fuzzer::SaveState(ThreadContext *tc)
 
   uint64_t num_entries = all_entries.size();
   fwrite(&num_entries, sizeof(num_entries), 1, fp);
-  for (SampleQueueEntry *entry : all_entries)
-  {
+  for (SampleQueueEntry *entry : all_entries) {
     entry->Save(fp);
     tc->mutator->SaveContext(entry->context, fp);
   }
@@ -1026,16 +915,15 @@ void Fuzzer::SaveState(ThreadContext *tc)
   output_mutex.Unlock();
 }
 
-void Fuzzer::RestoreState(ThreadContext *tc)
-{
+void Fuzzer::RestoreState(ThreadContext *tc) {
   output_mutex.Lock();
   coverage_mutex.Lock();
 
   std::string out_file = DirJoin(out_dir, std::string("state.dat"));
   FILE *fp = fopen(out_file.c_str(), "rb");
-  if (!fp)
-  {
-    FATAL("Error restoring state. Did the previous session run long enough for state to be saved?");
+  if (!fp) {
+    FATAL("Error restoring state. Did the previous session run long enough for "
+          "state to be saved?");
   }
 
   fread(&num_samples, sizeof(num_samples), 1, fp);
@@ -1049,8 +937,7 @@ void Fuzzer::RestoreState(ThreadContext *tc)
   uint64_t num_entries;
   fread(&num_entries, sizeof(num_entries), 1, fp);
 
-  for (uint64_t i = 0; i < num_entries; i++)
-  {
+  for (uint64_t i = 0; i < num_entries; i++) {
     Sample *sample = new Sample();
     SampleQueueEntry *entry = new SampleQueueEntry;
     entry->Load(fp);
@@ -1060,16 +947,13 @@ void Fuzzer::RestoreState(ThreadContext *tc)
     entry->context = tc->mutator->CreateSampleContext(sample);
     tc->mutator->LoadContext(entry->context, fp);
 
-    if (TrackHotOffsets())
-    {
-      if (keep_samples_in_memory)
-      {
+    if (TrackHotOffsets()) {
+      if (keep_samples_in_memory) {
         sample_trie.AddSample(entry->sample);
       }
     }
 
-    if (!keep_samples_in_memory)
-    {
+    if (!keep_samples_in_memory) {
       entry->sample->filename = outfile;
       entry->sample->FreeMemory();
     }
@@ -1085,8 +969,7 @@ void Fuzzer::RestoreState(ThreadContext *tc)
 
   uint64_t sentry;
   fread(&sentry, sizeof(sentry), 1, fp);
-  if (sentry != 0x66757a7a73746174)
-  {
+  if (sentry != 0x66757a7a73746174) {
     FATAL("State could not be restored correctly");
   }
 
@@ -1096,35 +979,34 @@ void Fuzzer::RestoreState(ThreadContext *tc)
   output_mutex.Unlock();
 }
 
-void Fuzzer::AdjustSamplePriority(ThreadContext *tc, SampleQueueEntry *entry, int found_new_coverage)
-{
+void Fuzzer::AdjustSamplePriority(ThreadContext *tc, SampleQueueEntry *entry,
+                                  int found_new_coverage) {
   if (found_new_coverage)
     entry->priority = 0;
   else
     entry->priority--;
 }
 
-Fuzzer::ThreadContext *Fuzzer::CreateThreadContext(int argc, char **argv, int thread_id)
-{
+Fuzzer::ThreadContext *Fuzzer::CreateThreadContext(int argc, char **argv,
+                                                   int thread_id) {
   ThreadContext *tc = new ThreadContext();
 
   // copy arguments for each thread
   tc->target_argc = target_argc;
   tc->target_argv = (char **)malloc((target_argc + 1) * sizeof(char *));
-  for (int i = 0; i < target_argc; i++)
-  {
+  for (int i = 0; i < target_argc; i++) {
     tc->target_argv[i] = target_argv[i];
   }
   tc->target_argv[target_argc] = NULL;
 
   tc->thread_id = thread_id;
   tc->fuzzer = this;
-  
+
   // Replace ##FUZZ_THREAD_ID## placeholder with actual thread ID
   char thread_id_str[32];
   sprintf(thread_id_str, "%d", thread_id);
   ReplaceTargetCmdArgSubstring(tc, "##FUZZ_THREAD_ID##", thread_id_str);
-  
+
   tc->prng = CreatePRNG(argc, argv, tc);
   tc->mutator = CreateMutator(argc, argv, tc);
   tc->instrumentation = CreateInstrumentation(argc, argv, tc);
@@ -1136,16 +1018,15 @@ Fuzzer::ThreadContext *Fuzzer::CreateThreadContext(int argc, char **argv, int th
   return tc;
 }
 
-bool Fuzzer::MagicOutputFilter(Sample *original_sample, Sample *output_sample, const char *magic, size_t magic_size)
-{
-  if ((original_sample->size >= magic_size) && !memcmp(original_sample->bytes, magic, magic_size))
-  {
+bool Fuzzer::MagicOutputFilter(Sample *original_sample, Sample *output_sample,
+                               const char *magic, size_t magic_size) {
+  if ((original_sample->size >= magic_size) &&
+      !memcmp(original_sample->bytes, magic, magic_size)) {
     return false;
   }
 
   *output_sample = *original_sample;
-  for (int i = 0; i < magic_size; i++)
-  {
+  for (int i = 0; i < magic_size; i++) {
     if (i >= output_sample->size)
       break;
     output_sample->bytes[i] = magic[i];
@@ -1153,12 +1034,10 @@ bool Fuzzer::MagicOutputFilter(Sample *original_sample, Sample *output_sample, c
   return true;
 }
 
-void Fuzzer::ReplaceTargetCmdArg(ThreadContext *tc, const char *search, const char *replace)
-{
-  for (int i = 0; i < tc->target_argc; i++)
-  {
-    if (strcmp(tc->target_argv[i], search) == 0)
-    {
+void Fuzzer::ReplaceTargetCmdArg(ThreadContext *tc, const char *search,
+                                 const char *replace) {
+  for (int i = 0; i < tc->target_argc; i++) {
+    if (strcmp(tc->target_argv[i], search) == 0) {
       char *arg = (char *)malloc(strlen(replace) + 1);
       strcpy(arg, replace);
       tc->target_argv[i] = arg;
@@ -1166,58 +1045,53 @@ void Fuzzer::ReplaceTargetCmdArg(ThreadContext *tc, const char *search, const ch
   }
 }
 
-void Fuzzer::ReplaceTargetCmdArgSubstring(ThreadContext *tc, const char *search, const char *replace)
-{
+void Fuzzer::ReplaceTargetCmdArgSubstring(ThreadContext *tc, const char *search,
+                                          const char *replace) {
   size_t search_len = strlen(search);
   size_t replace_len = strlen(replace);
-  
-  for (int i = 0; i < tc->target_argc; i++)
-  {
+
+  for (int i = 0; i < tc->target_argc; i++) {
     char *found = strstr(tc->target_argv[i], search);
-    if (found)
-    {
+    if (found) {
       // Calculate the new string length
       size_t prefix_len = found - tc->target_argv[i];
       size_t suffix_len = strlen(found + search_len);
       size_t new_len = prefix_len + replace_len + suffix_len;
-      
+
       // Allocate new string
       char *new_arg = (char *)malloc(new_len + 1);
-      
+
       // Copy prefix
       memcpy(new_arg, tc->target_argv[i], prefix_len);
-      
+
       // Copy replacement
       memcpy(new_arg + prefix_len, replace, replace_len);
-      
+
       // Copy suffix
       strcpy(new_arg + prefix_len + replace_len, found + search_len);
-      
+
       // Replace the argument
       tc->target_argv[i] = new_arg;
     }
   }
 }
 
-PRNG *Fuzzer::CreatePRNG(int argc, char **argv, ThreadContext *tc)
-{
+PRNG *Fuzzer::CreatePRNG(int argc, char **argv, ThreadContext *tc) {
   return new MTPRNG();
 }
 
-Instrumentation *Fuzzer::CreateInstrumentation(int argc, char **argv, ThreadContext *tc)
-{
+Instrumentation *Fuzzer::CreateInstrumentation(int argc, char **argv,
+                                               ThreadContext *tc) {
   Instrumentation *instrumentation = NULL;
 
 #if defined(linux) && !defined(__ANDROID__)
   char *option = GetOption("-instrumentation", argc, argv);
-  if (option && !strcmp(option, "sancov"))
-  {
+  if (option && !strcmp(option, "sancov")) {
     instrumentation = new SanCovInstrumentation(tc->thread_id);
   }
 #endif
 
-  if (!instrumentation)
-  {
+  if (!instrumentation) {
     instrumentation = new TinyInstInstrumentation(tc->thread_id);
   }
 
@@ -1225,73 +1099,72 @@ Instrumentation *Fuzzer::CreateInstrumentation(int argc, char **argv, ThreadCont
   return instrumentation;
 }
 
-SampleDelivery *Fuzzer::CreateSampleDelivery(int argc, char **argv, ThreadContext *tc)
-{
+SampleDelivery *Fuzzer::CreateSampleDelivery(int argc, char **argv,
+                                             ThreadContext *tc) {
   char *option = GetOption("-delivery", argc, argv);
-  if (!option || !strcmp(option, "file"))
-  {
+  if (!option || !strcmp(option, "file")) {
 
     string extension = "";
     char *extension_opt = GetOption("-file_extension", argc, argv);
-    if (extension_opt)
-    {
+    if (extension_opt) {
       extension = string(".") + string(extension_opt);
     }
 
-    string outfile = DirJoin(delivery_dir, string("input_") + std::to_string(tc->thread_id) + extension);
+    string outfile =
+        DirJoin(delivery_dir,
+                string("input_") + std::to_string(tc->thread_id) + extension);
     ReplaceTargetCmdArg(tc, "@@", outfile.c_str());
 
     FileSampleDelivery *sampleDelivery = new FileSampleDelivery();
     sampleDelivery->Init(argc, argv);
     sampleDelivery->SetFilename(outfile);
     return sampleDelivery;
-  }
-  else if (!strcmp(option, "shmem"))
-  {
+  } else if (!strcmp(option, "shmem")) {
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-    string shm_name = string("shm_fuzz_") + std::to_string(GetCurrentProcessId()) + "_" + std::to_string(tc->thread_id);
+    string shm_name = string("shm_fuzz_") +
+                      std::to_string(GetCurrentProcessId()) + "_" +
+                      std::to_string(tc->thread_id);
 #else
-    string shm_name = string("/shm_fuzz_") + std::to_string(getpid()) + "_" + std::to_string(tc->thread_id);
+    string shm_name = string("/shm_fuzz_") + std::to_string(getpid()) + "_" +
+                      std::to_string(tc->thread_id);
 #endif
     ReplaceTargetCmdArg(tc, "@@", shm_name.c_str());
 
-    SHMSampleDelivery *sampleDelivery = new SHMSampleDelivery((char *)shm_name.c_str(), Sample::max_size + 4);
+    SHMSampleDelivery *sampleDelivery =
+        new SHMSampleDelivery((char *)shm_name.c_str(), Sample::max_size + 4);
     sampleDelivery->Init(argc, argv);
     return sampleDelivery;
-  }
-  else if (!strcmp(option, "network"))
-  {
+  } else if (!strcmp(option, "network")) {
     char *address = GetOption("-address", argc, argv);
     int port = GetIntOption("-port", argc, argv, 0);
     int init_time = GetIntOption("-network_init_time", argc, argv, 0);
-    if (!address || !port)
-    {
+    if (!address || !port) {
       FATAL("-network and -port needed with network sample delivery");
     }
-    if (port == 0)
-    {
+    if (port == 0) {
       FATAL("port is not a number");
     }
-    NetworkSampleDelivery *sampleDelivery = new NetworkSampleDelivery(address, port, init_time);
+    NetworkSampleDelivery *sampleDelivery =
+        new NetworkSampleDelivery(address, port, init_time);
     return sampleDelivery;
-  }
-  else if (!strcmp(option, "environment"))
-  {
+  } else if (!strcmp(option, "environment")) {
     string extension = "";
     char *extension_opt = GetOption("-file_extension", argc, argv);
-    if (extension_opt)
-    {
+    if (extension_opt) {
       extension = string(".") + string(extension_opt);
     }
-    string outfile = DirJoin(delivery_dir, string("input_") + std::to_string(tc->thread_id) + extension);
+    string outfile =
+        DirJoin(delivery_dir,
+                string("input_") + std::to_string(tc->thread_id) + extension);
 
     // Find @@VARNAME in target_argv and extract VARNAME
     const char *env_prefix = "@@";
     char *env_var_name = nullptr;
-    
+
     for (int i = 0; i < tc->target_argc; i++) {
-      if (strncmp(tc->target_argv[i], env_prefix, 2) == 0 && strlen(tc->target_argv[i]) > 2) {
+      if (strncmp(tc->target_argv[i], env_prefix, 2) == 0 &&
+          strlen(tc->target_argv[i]) > 2) {
         env_var_name = tc->target_argv[i] + 2;
         // Replace @@VARNAME with @@VARNAME=outfile
         std::string new_arg = std::string("@@") + env_var_name + "=" + outfile;
@@ -1301,36 +1174,36 @@ SampleDelivery *Fuzzer::CreateSampleDelivery(int argc, char **argv, ThreadContex
     }
 
     if (!env_var_name) {
-      FATAL("No environment variable name specified with @@VARNAME in target command line");
+      FATAL("No environment variable name specified with @@VARNAME in target "
+            "command line");
     }
 
-    // This file will be passed to the target process via the environment variable
-    // e.g., if the target command line has @@VARNAME, it will be replaced with @@VARNAME=outfile
-    // where outfile is the file path to save the input sample.
+    // This file will be passed to the target process via the environment
+    // variable e.g., if the target command line has @@VARNAME, it will be
+    // replaced with @@VARNAME=outfile where outfile is the file path to save
+    // the input sample.
     FileSampleDelivery *sampleDelivery = new FileSampleDelivery();
     sampleDelivery->Init(argc, argv);
     sampleDelivery->SetFilename(outfile);
     return sampleDelivery;
 
-  }
-  else
-  {
+  } else {
     FATAL("Unknown sample delivery option");
   }
 }
 
-RangeTracker *Fuzzer::CreateRangeTracker(int argc, char **argv, ThreadContext *tc)
-{
-  if (!track_ranges)
-  {
+RangeTracker *Fuzzer::CreateRangeTracker(int argc, char **argv,
+                                         ThreadContext *tc) {
+  if (!track_ranges) {
     return new RangeTracker();
-  }
-  else
-  {
+  } else {
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
-    string shm_name = string("shm_ranges_") + std::to_string(GetCurrentProcessId()) + "_" + std::to_string(tc->thread_id);
+    string shm_name = string("shm_ranges_") +
+                      std::to_string(GetCurrentProcessId()) + "_" +
+                      std::to_string(tc->thread_id);
 #else
-    string shm_name = string("/shm_ranges_") + std::to_string(getpid()) + "_" + std::to_string(tc->thread_id);
+    string shm_name = string("/shm_ranges_") + std::to_string(getpid()) + "_" +
+                      std::to_string(tc->thread_id);
 #endif
     ReplaceTargetCmdArg(tc, "@@ranges", shm_name.c_str());
 
@@ -1338,20 +1211,18 @@ RangeTracker *Fuzzer::CreateRangeTracker(int argc, char **argv, ThreadContext *t
   }
 }
 
-Minimizer *Fuzzer::CreateMinimizer(int argc, char **argv, ThreadContext *tc)
-{
+Minimizer *Fuzzer::CreateMinimizer(int argc, char **argv, ThreadContext *tc) {
   SimpleTrimmer *trimmer = new SimpleTrimmer();
   return trimmer;
 }
 
-bool Fuzzer::OutputFilter(Sample *original_sample, Sample *output_sample, ThreadContext *tc)
-{
+bool Fuzzer::OutputFilter(Sample *original_sample, Sample *output_sample,
+                          ThreadContext *tc) {
   // use the original sample
   return false;
 }
 
-void Fuzzer::SampleQueueEntry::Save(FILE *fp)
-{
+void Fuzzer::SampleQueueEntry::Save(FILE *fp) {
   uint64_t filename_size = sample_filename.size();
   fwrite(&filename_size, sizeof(filename_size), 1, fp);
   fwrite(sample_filename.data(), filename_size, 1, fp);
@@ -1369,8 +1240,7 @@ void Fuzzer::SampleQueueEntry::Save(FILE *fp)
   fwrite(ranges.data(), sizeof(ranges[0]), ranges_size, fp);
 }
 
-void Fuzzer::SampleQueueEntry::Load(FILE *fp)
-{
+void Fuzzer::SampleQueueEntry::Load(FILE *fp) {
   uint64_t filename_size;
   fread(&filename_size, sizeof(filename_size), 1, fp);
   char *str_buf = (char *)malloc(filename_size + 1);

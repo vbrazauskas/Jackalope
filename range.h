@@ -21,8 +21,7 @@ public:
   size_t from;
   size_t to;
 
-  bool operator<(const Range& other) const {
+  bool operator<(const Range &other) const {
     return this->from < other.from;
   }
 };
-

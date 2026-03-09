@@ -51,17 +51,16 @@ bool ByteFlipMutator::Mutate(Sample *inout_sample, PRNG *prng, std::vector<Sampl
 
 bool ArithmeticMutator::Mutate(Sample *inout_sample,
                                PRNG *prng,
-                               std::vector<Sample *> &all_samples)
-{
+                               std::vector<Sample *> &all_samples) {
   int flip_endian = prng->Rand(0, 1);
   int size = prng->Rand(0, 2);
-  switch(size) {
-    case 0:
-      return MutateArithmeticValue<uint16_t>(inout_sample, prng, flip_endian);
-    case 1:
-      return MutateArithmeticValue<uint32_t>(inout_sample, prng, flip_endian);
-    case 2:
-      return MutateArithmeticValue<uint64_t>(inout_sample, prng, flip_endian);
+  switch (size) {
+  case 0:
+    return MutateArithmeticValue<uint16_t>(inout_sample, prng, flip_endian);
+  case 1:
+    return MutateArithmeticValue<uint32_t>(inout_sample, prng, flip_endian);
+  case 2:
+    return MutateArithmeticValue<uint64_t>(inout_sample, prng, flip_endian);
   }
   return true;
 }
@@ -69,8 +68,7 @@ bool ArithmeticMutator::Mutate(Sample *inout_sample,
 template<typename T>
 bool ArithmeticMutator::MutateArithmeticValue(Sample *inout_sample,
                                               PRNG *prng,
-                                              int flip_endian)
-{
+                                              int flip_endian) {
   T value;
   size_t blockstart, blocksize;
   if (!GetRandBlock(inout_sample->size,
@@ -79,10 +77,10 @@ bool ArithmeticMutator::MutateArithmeticValue(Sample *inout_sample,
                     prng))
     return true;
   value = *(T *)(inout_sample->bytes + blockstart);
-  if(flip_endian) value = FlipEndian(value);
+  if (flip_endian) value = FlipEndian(value);
   int change = prng->Rand(-256, 256);
   value += change;
-  if(flip_endian) value = FlipEndian(value);
+  if (flip_endian) value = FlipEndian(value);
   *(T *)(inout_sample->bytes + blockstart) = value;
   return true;
 }
@@ -93,11 +91,11 @@ bool BlockFlipMutator::Mutate(Sample *inout_sample, PRNG *prng, std::vector<Samp
   if (!GetRandBlock(inout_sample->size, min_block_size, max_block_size, &blockpos, &blocksize, prng)) return true;
   if (uniform) {
     char c = (char)prng->Rand(0, 255);
-    for (size_t i = 0; i<blocksize; i++) {
+    for (size_t i = 0; i < blocksize; i++) {
       inout_sample->bytes[blockpos + i] = c;
     }
   } else {
-    for (size_t i = 0; i<blocksize; i++) {
+    for (size_t i = 0; i < blocksize; i++) {
       inout_sample->bytes[blockpos + i] = (char)prng->Rand(0, 255);
     }
   }
@@ -114,8 +112,11 @@ bool AppendMutator::Mutate(Sample *inout_sample, PRNG *prng, std::vector<Sample 
   }
   if (append <= 0) return true;
   size_t new_size = old_size + append;
-  inout_sample->bytes =
-    (char *)realloc(inout_sample->bytes, new_size);
+  char *new_bytes = (char *)realloc(inout_sample->bytes, new_size);
+  if (!new_bytes) {
+    FATAL("realloc failed in appendmutator");
+  }
+  inout_sample->bytes = new_bytes;
   inout_sample->size = new_size;
   for (size_t i = old_size; i < new_size; i++) {
     inout_sample->bytes[i] = (char)prng->Rand(0, 255);
@@ -134,15 +135,15 @@ bool BlockInsertMutator::Mutate(Sample *inout_sample, PRNG *prng, std::vector<Sa
   size_t where = prng->Rand(0, (int)old_size);
   size_t new_size = old_size + to_insert;
   if (to_insert <= 0) return true;
-  
+
   char *old_bytes = inout_sample->bytes;
   char *new_bytes = (char *)malloc(new_size);
   memcpy(new_bytes, old_bytes, where);
-  
+
   for (size_t i = 0; i < to_insert; i++) {
     new_bytes[where + i] = (char)prng->Rand(0, 255);
   }
-  
+
   memcpy(new_bytes + where + to_insert, old_bytes + where, old_size - where);
 
   if (old_bytes) free(old_bytes);
@@ -163,10 +164,10 @@ bool BlockDuplicateMutator::Mutate(Sample *inout_sample, PRNG *prng, std::vector
   char *newbytes;
   newbytes = (char *)malloc(inout_sample->size + blockcount * blocksize);
   memcpy(newbytes, inout_sample->bytes, blockpos + blocksize);
-  for (int64_t i = 0; i<blockcount; i++) {
-    memcpy(newbytes + blockpos + (i + 1)*blocksize, inout_sample->bytes + blockpos, blocksize);
+  for (int64_t i = 0; i < blockcount; i++) {
+    memcpy(newbytes + blockpos + (i + 1) * blocksize, inout_sample->bytes + blockpos, blocksize);
   }
-  memcpy(newbytes + blockpos + (blockcount + 1)*blocksize, 
+  memcpy(newbytes + blockpos + (blockcount + 1) * blocksize,
          inout_sample->bytes + blockpos + blocksize,
          inout_sample->size - blockpos - blocksize);
   if (inout_sample->bytes) free(inout_sample->bytes);
@@ -175,7 +176,7 @@ bool BlockDuplicateMutator::Mutate(Sample *inout_sample, PRNG *prng, std::vector
   return true;
 }
 
-void Mutator::AddInterestingValue(char *data, size_t size, std::vector<Sample>& interesting_values) {
+void Mutator::AddInterestingValue(char *data, size_t size, std::vector<Sample> &interesting_values) {
   Sample interesting_sample;
   interesting_sample.Init(data, size);
   interesting_values.push_back(interesting_sample);
@@ -199,11 +200,11 @@ InterestingValueMutator::InterestingValueMutator(bool use_default_values) {
   }
 }
 
-template<typename T> void Mutator::AddDefaultInterestingValues(std::vector<Sample>& interesting_values) {
+template<typename T> void Mutator::AddDefaultInterestingValues(std::vector<Sample> &interesting_values) {
   uint32_t M[] = {2, 3, 4, 6, 8, 10, 12, 16, 24, 32, 40, 48,
                   56, 64, 72, 80, 88, 96, 104, 112, 120, 128,
                   136, 144, 152, 160, 168, 176, 184, 192, 200,
-                  208, 216, 224, 232, 240, 248, 256 };
+                  208, 216, 224, 232, 240, 248, 256};
 
   int32_t N[] = {1, 2, 3, 4, 6, 8, 10, 12, 16, 32, 64, 128, 256};
 
@@ -217,15 +218,15 @@ template<typename T> void Mutator::AddDefaultInterestingValues(std::vector<Sampl
     value = (value << 1);
   }
 
-  for (uint32_t i = 0; i < (sizeof(M)/sizeof(M[0])); i++) {
+  for (uint32_t i = 0; i < (sizeof(M) / sizeof(M[0])); i++) {
     int32_t m = M[i];
     value = (T)(-1) / m + 1;
     AddInterestingValue((char *)(&value), sizeof(value), interesting_values);
     value = FlipEndian(value);
     AddInterestingValue((char *)(&value), sizeof(value), interesting_values);
   }
-    
-  for (uint32_t j = 0; j < (sizeof(N)/sizeof(N[0])); j++) {
+
+  for (uint32_t j = 0; j < (sizeof(N) / sizeof(N[0])); j++) {
     int32_t n = N[j];
     value = (T)(0) - n;
     AddInterestingValue((char *)(&value), sizeof(value), interesting_values);
@@ -235,8 +236,8 @@ template<typename T> void Mutator::AddDefaultInterestingValues(std::vector<Sampl
 }
 
 void InterestingValueMutator::DictUnescape(std::string &in, std::string &out) {
-  const char* in_buf = in.data();
-  char* out_buf = (char*)malloc(in.size());
+  const char *in_buf = in.data();
+  char *out_buf = (char *)malloc(in.size());
   size_t in_pos = 0, out_pos = 0;
   size_t in_size = in.size();
 
@@ -249,9 +250,8 @@ void InterestingValueMutator::DictUnescape(std::string &in, std::string &out) {
   }
 
   while (in_pos < (in_size - 3)) {
-    if((in_buf[in_pos] == '\\') && (in_buf[in_pos + 1] == 'x') &&
-       isxdigit(in_buf[in_pos + 2]) && isxdigit(in_buf[in_pos + 3]))
-    {
+    if ((in_buf[in_pos] == '\\') && (in_buf[in_pos + 1] == 'x') &&
+        isxdigit(in_buf[in_pos + 2]) && isxdigit(in_buf[in_pos + 3])) {
       convert_buf[0] = in_buf[in_pos + 2];
       convert_buf[1] = in_buf[in_pos + 3];
       out_buf[out_pos] = (char)strtol(convert_buf, NULL, 16);
@@ -274,7 +274,7 @@ void InterestingValueMutator::DictUnescape(std::string &in, std::string &out) {
   free(out_buf);
 }
 
-void InterestingValueMutator::AddDictionary(char* path) {
+void InterestingValueMutator::AddDictionary(char *path) {
   std::fstream f;
   f.open(path, std::ios::in);
   if (!f.is_open()) {
@@ -303,33 +303,33 @@ void InterestingValueMutator::AddDictionary(char* path) {
 }
 
 bool SpliceMutator::Mutate(Sample *inout_sample, PRNG *prng, std::vector<Sample *> &all_samples) {
-  if(all_samples.empty()) return true;
+  if (all_samples.empty()) return true;
 
   bool displace = false;
-  if(prng->RandReal() < displacement_p) {
+  if (prng->RandReal() < displacement_p) {
     displace = true;
   }
-  
+
   Sample *other_sample = all_samples[prng->Rand(0, (int)all_samples.size() - 1)];
 
-  if(inout_sample->size == 0) return false;
-  if(other_sample->size == 0) return false;
+  if (inout_sample->size == 0) return false;
+  if (other_sample->size == 0) return false;
 
-  if(points == 1) {
+  if (points == 1) {
     size_t point1, point2;
     char *new_bytes;
     size_t new_sample_size;
-    if(displace) {
+    if (displace) {
       point1 = prng->Rand(0, (int)(inout_sample->size - 1));
       point2 = prng->Rand(0, (int)(other_sample->size - 1));
     } else {
       size_t minsize = inout_sample->size;
-      if(other_sample->size < minsize) minsize = other_sample->size;
+      if (other_sample->size < minsize) minsize = other_sample->size;
       point1 = prng->Rand(0, (int)(minsize - 1));
       point2 = point1;
     }
     new_sample_size = point1 + (other_sample->size - point2);
-    if(new_sample_size == inout_sample->size) {
+    if (new_sample_size == inout_sample->size) {
       memcpy(inout_sample->bytes + point1, other_sample->bytes + point2, other_sample->size - point2);
       return true;
     } else {
@@ -342,16 +342,16 @@ bool SpliceMutator::Mutate(Sample *inout_sample, PRNG *prng, std::vector<Sample 
       if (inout_sample->size > Sample::max_size) inout_sample->Trim(Sample::max_size);
       return true;
     }
-  } else if(points != 2) {
+  } else if (points != 2) {
     FATAL("Splice mutator can only work with 1 or 2 splice points");
   }
-  
-  if(displace) {
+
+  if (displace) {
     size_t blockstart1, blocksize1;
     size_t blockstart2, blocksize2;
     size_t blockstart3, blocksize3;
-    if(!GetRandBlock(inout_sample->size, 1, inout_sample->size, &blockstart1, &blocksize1, prng)) return true;
-    if(!GetRandBlock(other_sample->size, 1, other_sample->size, &blockstart2, &blocksize2, prng)) return true;
+    if (!GetRandBlock(inout_sample->size, 1, inout_sample->size, &blockstart1, &blocksize1, prng)) return true;
+    if (!GetRandBlock(other_sample->size, 1, other_sample->size, &blockstart2, &blocksize2, prng)) return true;
     blockstart3 = blockstart1 + blocksize1;
     blocksize3 = inout_sample->size - blockstart3;
     size_t new_sample_size = blockstart1 + blocksize2 + blocksize3;
@@ -359,7 +359,7 @@ bool SpliceMutator::Mutate(Sample *inout_sample, PRNG *prng, std::vector<Sample 
     memcpy(new_bytes, inout_sample->bytes, blockstart1);
     memcpy(new_bytes + blockstart1, other_sample->bytes + blockstart2, blocksize2);
     memcpy(new_bytes + blockstart1 + blocksize2, inout_sample->bytes + blockstart3, blocksize3);
-    if(new_sample_size > Sample::max_size) {
+    if (new_sample_size > Sample::max_size) {
       new_sample_size = Sample::max_size;
       new_bytes = (char *)realloc(new_bytes, Sample::max_size);
     }
@@ -369,12 +369,12 @@ bool SpliceMutator::Mutate(Sample *inout_sample, PRNG *prng, std::vector<Sample 
     return true;
   } else {
     size_t blockstart, blocksize;
-    if(!GetRandBlock(other_sample->size, 2, other_sample->size, &blockstart, &blocksize, prng)) return true;
-    if(blockstart > inout_sample->size) {
+    if (!GetRandBlock(other_sample->size, 2, other_sample->size, &blockstart, &blocksize, prng)) return true;
+    if (blockstart > inout_sample->size) {
       blocksize += (blockstart - inout_sample->size);
       blockstart = inout_sample->size;
     }
-    if((blockstart + blocksize) <= inout_sample->size) {
+    if ((blockstart + blocksize) <= inout_sample->size) {
       memcpy(inout_sample->bytes + blockstart, other_sample->bytes + blockstart, blocksize);
       return true;
     }
@@ -394,20 +394,22 @@ void BaseDeterministicContext::AddHotOffset(size_t offset) {
 
   // in any case, restart scan
   cur_region = 0;
-  
+
   MutateRegion new_region;
   new_region.cur_progress = 0;
 
   size_t newregion_start = offset;
-  if(newregion_start < DETERMINISTIC_MUTATE_BYTES_PREVIOUS) newregion_start = 0;
-  else newregion_start -= DETERMINISTIC_MUTATE_BYTES_PREVIOUS;
+  if (newregion_start < DETERMINISTIC_MUTATE_BYTES_PREVIOUS)
+    newregion_start = 0;
+  else
+    newregion_start -= DETERMINISTIC_MUTATE_BYTES_PREVIOUS;
   size_t newregion_end = offset + DETERMINISTIC_MUTATE_BYTES_NEXT;
-  
-  for(auto iter = regions.begin(); iter != regions.end(); iter++) {
-    if(newregion_start < iter->start) {
+
+  for (auto iter = regions.begin(); iter != regions.end(); iter++) {
+    if (newregion_start < iter->start) {
       new_region.start = newregion_start;
       new_region.cur = new_region.start;
-      if(iter->start > newregion_end) {
+      if (iter->start > newregion_end) {
         new_region.end = newregion_end;
       } else {
         new_region.end = iter->start;
@@ -416,8 +418,8 @@ void BaseDeterministicContext::AddHotOffset(size_t offset) {
       mutex.Unlock();
       return;
     }
-    if(newregion_start <= iter->end) {
-      if(newregion_end <= iter->end) {
+    if (newregion_start <= iter->end) {
+      if (newregion_end <= iter->end) {
         mutex.Unlock();
         return;
       }
@@ -437,16 +439,16 @@ void BaseDeterministicContext::AddHotOffset(size_t offset) {
 
 bool BaseDeterministicContext::GetNextByteToMutate(size_t *pos, size_t *progress, size_t max_progress) {
   MutateRegion *region = NULL;
-  
-  while(cur_region < regions.size()) {
+
+  while (cur_region < regions.size()) {
     region = &(regions[cur_region]);
 
-    if(region->cur_progress >= max_progress) {
+    if (region->cur_progress >= max_progress) {
       region->cur_progress = 0;
       region->cur++;
     }
 
-    if(region->cur >= region->end) {
+    if (region->cur >= region->end) {
       cur_region++;
       continue;
     }
@@ -468,16 +470,16 @@ MutatorSampleContext *BaseDeterministicMutator::CreateSampleContext(Sample *samp
 bool DeterministicByteFlipMutator::Mutate(Sample *inout_sample, PRNG *prng, std::vector<Sample *> &all_samples) {
   size_t pos;
   size_t value;
-  
-  if(!context->GetNextByteToMutate(&pos, &value, 256)) {
+
+  if (!context->GetNextByteToMutate(&pos, &value, 256)) {
     return false;
   }
-  
-  if(pos >= inout_sample->size) {
+
+  if (pos >= inout_sample->size) {
     inout_sample->Resize(pos + 1);
   }
   inout_sample->bytes[pos] = (char)(value);
-  
+
   return true;
 }
 
@@ -492,29 +494,29 @@ DeterministicInterestingValueMutator::DeterministicInterestingValueMutator(bool 
 bool DeterministicInterestingValueMutator::Mutate(Sample *inout_sample, PRNG *prng, std::vector<Sample *> &all_samples) {
   size_t pos;
   size_t value_index;
-  
-  if(!context->GetNextByteToMutate(&pos, &value_index, interesting_values.size())) {
+
+  if (!context->GetNextByteToMutate(&pos, &value_index, interesting_values.size())) {
     return false;
   }
-  
+
   Sample *interesting_sample = &interesting_values[value_index];
-  if((pos + interesting_sample->size) > inout_sample->size) {
+  if ((pos + interesting_sample->size) > inout_sample->size) {
     inout_sample->Resize(pos + interesting_sample->size);
   }
   memcpy(inout_sample->bytes + pos, interesting_sample->bytes, interesting_sample->size);
-  
+
   return true;
 }
 
-bool RangeMutator::Mutate(Sample* inout_sample, PRNG* prng, std::vector<Sample*>& all_samples) {
-  Mutator* child_mutator = child_mutators[0];
+bool RangeMutator::Mutate(Sample *inout_sample, PRNG *prng, std::vector<Sample *> &all_samples) {
+  Mutator *child_mutator = child_mutators[0];
 
   if (ranges->empty()) {
     return child_mutator->Mutate(inout_sample, prng, all_samples);
   }
 
   // pick a range
-  Range& range = (*ranges)[prng->Rand() % ranges->size()];
+  Range &range = (*ranges)[prng->Rand() % ranges->size()];
 
   // printf("Mutating range %zd %zd\n", range.from, range.to);
 
@@ -540,34 +542,34 @@ bool RangeMutator::Mutate(Sample* inout_sample, PRNG* prng, std::vector<Sample*>
 
 void RepeatMutator::UpdateStats() {
   stats_mutex.Lock();
-  
+
   stats[next_stat] = last_num_repeats;
   next_stat = (next_stat + 1) % REPEAT_STATS;
-  
-  if(nstats >= REPEAT_STATS) {
+
+  if (nstats >= REPEAT_STATS) {
     std::vector<size_t> sort_array;
     sort_array.assign(&(stats[0]), &(stats[REPEAT_STATS]));
     std::sort(sort_array.begin(), sort_array.end());
-    median_num_repeats = sort_array[REPEAT_STATS/2];
-    
-    float new_adapted_repeat_p = 1.0f - 1.0f/median_num_repeats;
-    if(new_adapted_repeat_p < 0.5) new_adapted_repeat_p = 0.5;
-    
-    if(new_adapted_repeat_p != adapted_repeat_p) {
+    median_num_repeats = sort_array[REPEAT_STATS / 2];
+
+    float new_adapted_repeat_p = 1.0f - 1.0f / median_num_repeats;
+    if (new_adapted_repeat_p < 0.5) new_adapted_repeat_p = 0.5;
+
+    if (new_adapted_repeat_p != adapted_repeat_p) {
       adapted_repeat_p = new_adapted_repeat_p;
       printf("Adjusting mutation repeat probability to %g\n", adapted_repeat_p);
     }
-    
+
   } else {
     nstats++;
   }
-  
+
   stats_mutex.Unlock();
 }
 
 void RepeatMutator::SaveGlobalState(FILE *fp) {
   stats_mutex.Lock();
-  
+
   fwrite(stats, sizeof(stats), 1, fp);
   fwrite(&nstats, sizeof(nstats), 1, fp);
   fwrite(&next_stat, sizeof(next_stat), 1, fp);

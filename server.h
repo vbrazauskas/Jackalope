@@ -43,7 +43,7 @@ typedef int socket_type;
 
 #define closesocket close
 
-#endif 
+#endif
 
 #define MAX_CONNECTIONS 8
 
@@ -76,7 +76,8 @@ protected:
 
 class CoverageServer : public ServerCommon {
 public:
-  CoverageServer() : server_timestamp(0), server_port(DEFAULT_SERVER_PORT), num_samples(0), num_crashes(0), num_unique_crashes(0) { }
+  CoverageServer()
+      : server_timestamp(0), server_port(DEFAULT_SERVER_PORT), num_samples(0), num_crashes(0), num_unique_crashes(0) { }
 
   // for incremental updates
   struct TimestampIndex {
@@ -125,7 +126,7 @@ public:
   void Init(int argc, char **argv);
   void SetupDirectories();
 
-  bool CheckFilename(std::string& filename);
+  bool CheckFilename(std::string &filename);
 
   uint64_t server_timestamp;
 

@@ -22,7 +22,7 @@ SharedMemory::SharedMemory() {
   shm = NULL;
 }
 
-SharedMemory::SharedMemory(char* name, size_t size) {
+SharedMemory::SharedMemory(char *name, size_t size) {
   Open(name, size);
 }
 
@@ -33,26 +33,25 @@ SharedMemory::~SharedMemory() {
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32)
 
-void SharedMemory::Open(char* name, size_t size) {
+void SharedMemory::Open(char *name, size_t size) {
   shm_handle = CreateFileMapping(
-    INVALID_HANDLE_VALUE,
-    NULL,
-    PAGE_READWRITE,
-    0,
-    (DWORD)size,
-    name);
+      INVALID_HANDLE_VALUE,
+      NULL,
+      PAGE_READWRITE,
+      0,
+      (DWORD)size,
+      name);
 
   if (shm_handle == NULL) {
     FATAL("CreateFileMapping failed, %x", GetLastError());
   }
 
-  shm = (unsigned char*)MapViewOfFile(
-    shm_handle,          // handle to map object
-    FILE_MAP_ALL_ACCESS, // read/write permission
-    0,
-    0,
-    size
-  );
+  shm = (unsigned char *)MapViewOfFile(
+      shm_handle,          // handle to map object
+      FILE_MAP_ALL_ACCESS, // read/write permission
+      0,
+      0,
+      size);
 
   if (!shm) {
     FATAL("MapViewOfFile failed");
@@ -70,46 +69,55 @@ void SharedMemory::Close() {
 #include <sys/mman.h>
 #include <fcntl.h>
 
-void SharedMemory::Open(char* name, size_t size) {
-#ifdef __ANDROID__
+void SharedMemory::Open(char *name, size_t size) {
+#if defined(__ANDROID__) && !defined(ANDROID_VM)
   FATAL("Shared memory is not implemented on Android");
 #else
   int res;
 
   this->size = size;
-  size_t name_size = strlen(name);
-  this->name = (char*)malloc(name_size + 1);
-  strcpy(this->name, name);
 
   // get shared memory file descriptor (NOT a file)
-  fd = shm_open(name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-  if (fd == -1)
-  {
+#ifdef ANDROID_VM
+  size_t name_size = strlen(name) + strlen("/dev/shm");
+  this->name = (char *)malloc(name_size + 1);
+  strcpy(this->name, "/dev/shm");
+  strcat(this->name, name);
+  fd = open(this->name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+#else
+  size_t name_size = strlen(name);
+  this->name = (char *)malloc(name_size + 1);
+  strcpy(this->name, name);
+  fd = shm_open(this->name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+#endif
+  if (fd == -1) {
     FATAL("Error creating shared memory");
   }
 
   // extend shared memory object as by default it's initialized with size 0
   res = ftruncate(fd, size);
-  if (res == -1)
-  {
+  if (res == -1) {
     FATAL("Error creating shared memory");
   }
 
   // map shared memory to process address space
-  shm = (unsigned char*)mmap(NULL, size, PROT_WRITE, MAP_SHARED, fd, 0);
-  if (shm == MAP_FAILED)
-  {
+  shm = (unsigned char *)mmap(NULL, size, PROT_WRITE, MAP_SHARED, fd, 0);
+  if (shm == MAP_FAILED) {
     FATAL("Error creating shared memory");
   }
 #endif
 }
 
 void SharedMemory::Close() {
-#ifdef __ANDROID__
+#if defined(__ANDROID__) && !defined(ANDROID_VM)
   FATAL("Shared memory is not implemented on Android");
 #else
   munmap(shm, size);
+#ifdef ANDROID_VM
+  unlink(name);
+#else
   shm_unlink(name);
+#endif
   close(fd);
   free(name);
 #endif

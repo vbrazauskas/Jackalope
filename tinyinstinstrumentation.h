@@ -16,23 +16,25 @@ limitations under the License.
 
 #pragma once
 
+#include "coverage.h"
+#include "instrumentation.h"
+#include "runresult.h"
 #include <inttypes.h>
 #include <string>
-#include "coverage.h"
-#include "runresult.h"
-#include "instrumentation.h"
 
 class LiteCov;
 
 class TinyInstInstrumentation : public Instrumentation {
-public:  
+public:
   TinyInstInstrumentation(int ctx_thread_id = 0);
   ~TinyInstInstrumentation();
 
   void Init(int argc, char **argv) override;
 
-  RunResult Run(int argc, char** argv, uint32_t init_timeout, uint32_t timeout) override;
-  RunResult RunWithCrashAnalysis(int argc, char** argv, uint32_t init_timeout, uint32_t timeout) override;
+  RunResult Run(int argc, char **argv, uint32_t init_timeout,
+                uint32_t timeout) override;
+  RunResult RunWithCrashAnalysis(int argc, char **argv, uint32_t init_timeout,
+                                 uint32_t timeout) override;
 
   void CleanTarget() override;
 
@@ -46,10 +48,9 @@ public:
   std::string GetCrashName() override;
 
 protected:
-  LiteCov * instrumentation;
+  LiteCov *instrumentation;
   bool persist;
   int num_iterations;
   int cur_iteration;
   int ctx_thread_id = 0;
 };
-

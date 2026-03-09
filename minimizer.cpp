@@ -14,27 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#include "common.h"
 #include "minimizer.h"
+#include "common.h"
 
-MinimizerContext* SimpleTrimmer::CreateContext(Sample* sample) {
+MinimizerContext *SimpleTrimmer::CreateContext(Sample *sample) {
   return new SimpleTrimmerContext();
 }
 
-int SimpleTrimmer::MinimizeStep(Sample* sample, MinimizerContext* context) {
-  SimpleTrimmerContext* trimmer_context = (SimpleTrimmerContext*)context;
+int SimpleTrimmer::MinimizeStep(Sample *sample, MinimizerContext *context) {
+  SimpleTrimmerContext *trimmer_context = (SimpleTrimmerContext *)context;
 
-  if (sample->size <= 1) return 0;
+  if (sample->size <= 1)
+    return 0;
   while (trimmer_context->trim_step >= sample->size) {
     trimmer_context->trim_step /= 2;
   }
-  if (trimmer_context->trim_step == 0) return 0;
+  if (trimmer_context->trim_step == 0)
+    return 0;
 
   sample->Trim(sample->size - trimmer_context->trim_step);
   return 1;
 }
 
-void SimpleTrimmer::ReportFail(Sample* sample, MinimizerContext* context) {
-  SimpleTrimmerContext* trimmer_context = (SimpleTrimmerContext*)context;
+void SimpleTrimmer::ReportFail(Sample *sample, MinimizerContext *context) {
+  SimpleTrimmerContext *trimmer_context = (SimpleTrimmerContext *)context;
   trimmer_context->trim_step /= 2;
 }

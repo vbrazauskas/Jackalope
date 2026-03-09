@@ -19,4 +19,9 @@ limitations under the License.
 void __pre_fuzz();
 void __post_fuzz(uint64_t return_value);
 
-#define JACKALOPE_FUZZ_LOOP(X) while(1) {__pre_fuzz();  uint64_t fuzz_ret = (X); __post_fuzz(fuzz_ret); }
+#define JACKALOPE_FUZZ_LOOP(X) \
+  while (1) {                  \
+    __pre_fuzz();              \
+    uint64_t fuzz_ret = (X);   \
+    __post_fuzz(fuzz_ret);     \
+  }
